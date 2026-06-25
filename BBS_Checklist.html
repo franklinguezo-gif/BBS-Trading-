@@ -3,237 +3,268 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>BBS — Checklist</title>
+<meta name="theme-color" content="#050f1a"/>
+<title>BBS — Checklist Sniper</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
-  :root{--bg:#050f1a;--bg2:#0a1c2e;--bg3:#0d2440;--teal:#00b4d8;--teal2:#0096b7;--green:#00c896;--green2:#00a67a;--accent:#00ffe0;--gold:#ffd700;--white:#f0fafa;--muted:#7aa8b8;--red:#ff4d6d;--card:#0a1f33;}
+  :root{--bg:#050f1a;--bg2:#0a1c2e;--bg3:#0d2440;--teal:#00b4d8;--green:#00c896;--green2:#00a67a;--accent:#00ffe0;--gold:#ffd700;--white:#f0fafa;--muted:#7aa8b8;--red:#ff4d6d;--card:#0a1f33;}
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{background:var(--bg);color:var(--white);font-family:'Inter',sans-serif;min-height:100vh;padding-bottom:60px;}
+  body{background:var(--bg);color:var(--white);font-family:'Inter',sans-serif;min-height:100vh;padding-bottom:80px;}
+
   header{background:linear-gradient(135deg,#051525 0%,#0a2540 60%,#051a30 100%);border-bottom:2px solid var(--teal);padding:20px 16px 14px;text-align:center;position:relative;}
   header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,180,216,.12) 0%,transparent 70%);}
   .brand{font-family:'Rajdhani',sans-serif;font-size:1.9rem;font-weight:700;letter-spacing:6px;background:linear-gradient(90deg,var(--teal),var(--green),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;position:relative;}
   .subtitle{font-family:'Rajdhani',sans-serif;font-size:.72rem;letter-spacing:4px;color:var(--muted);margin-top:2px;position:relative;}
   .devise{font-size:.68rem;letter-spacing:3px;color:var(--teal);margin-top:5px;position:relative;opacity:.85;}
-  .info-bar{display:flex;gap:10px;padding:14px 16px;background:var(--bg2);border-bottom:1px solid #0d3050;flex-wrap:wrap;}
-  .info-bar select,.info-bar input{flex:1;min-width:120px;background:var(--bg3);border:1px solid #1a4a6a;color:var(--white);padding:8px 10px;border-radius:6px;font-size:.82rem;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s;}
-  .info-bar select:focus,.info-bar input:focus{border-color:var(--teal);}
+
+  /* SETUP SELECTOR */
+  .setup-selector{display:flex;gap:10px;padding:14px 16px;background:var(--bg2);border-bottom:1px solid #0d3050;}
+  .setup-btn{flex:1;padding:12px 8px;border-radius:8px;font-family:'Rajdhani',sans-serif;font-size:.85rem;font-weight:700;letter-spacing:2px;cursor:pointer;border:2px solid #1a4a6a;background:var(--bg3);color:var(--muted);transition:all .2s;text-align:center;}
+  .setup-btn.active-a{background:linear-gradient(135deg,#003a50,#001e30);border-color:var(--teal);color:var(--teal);}
+  .setup-btn.active-b{background:linear-gradient(135deg,#003a28,#001e18);border-color:var(--green);color:var(--green);}
+
+  /* INFO BAR */
+  .info-bar{display:flex;gap:10px;padding:12px 16px;background:var(--bg2);border-bottom:1px solid #0d3050;flex-wrap:wrap;}
+  .info-bar select,.info-bar input{flex:1;min-width:120px;background:var(--bg3);border:1px solid #1a4a6a;color:var(--white);padding:8px 10px;border-radius:6px;font-size:.82rem;font-family:'Inter',sans-serif;outline:none;}
   .info-bar select option{background:#0a1c2e;}
+
+  /* PROGRESS */
   .progress-wrap{margin:14px 14px 0;background:var(--bg2);border-radius:10px;padding:14px;border:1px solid #0d3050;}
   .progress-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
   .progress-label{font-family:'Rajdhani',sans-serif;font-size:.72rem;letter-spacing:2px;color:var(--muted);}
   .progress-count{font-family:'Rajdhani',sans-serif;font-size:1.1rem;font-weight:700;color:var(--accent);}
   .bar-bg{height:6px;background:#0d3050;border-radius:3px;overflow:hidden;}
   .bar-fill{height:100%;background:linear-gradient(90deg,var(--teal),var(--green));border-radius:3px;transition:width .4s cubic-bezier(.4,0,.2,1);width:0%;}
+
+  /* STATUS */
   .status-wrap{margin:12px 14px 0;text-align:center;}
   .status-badge{display:inline-block;padding:10px 24px;border-radius:8px;font-family:'Rajdhani',sans-serif;font-size:1rem;font-weight:700;letter-spacing:3px;transition:all .3s;}
   .badge-wait{background:#0d2540;color:var(--muted);border:1px solid #1a4a6a;}
   .badge-almost{background:#1a3a00;color:#88dd44;border:1px solid #4a8800;}
   .badge-ready{background:linear-gradient(135deg,#003a28,#005a40);color:var(--accent);border:1px solid var(--green);box-shadow:0 0 18px rgba(0,200,150,.25);}
+
+  /* SECTION */
   .section{margin:14px 14px 0;border-radius:10px;overflow:hidden;border:1px solid #0d3050;}
-  .section-title{font-family:'Rajdhani',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:3px;padding:8px 14px;display:flex;align-items:center;gap:8px;}
-  .section-title.entry{background:linear-gradient(90deg,#003a50,#001e30);color:var(--teal);border-bottom:1px solid #0d3050;}
-  .section-title.manage{background:linear-gradient(90deg,#003a28,#001e18);color:var(--green);border-bottom:1px solid #0d3050;}
-  .section-title.mental{background:linear-gradient(90deg,#3a3000,#1e1800);color:var(--gold);border-bottom:1px solid #0d3050;}
-  .item{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;background:var(--card);border-bottom:1px solid #0a2035;cursor:pointer;transition:background .15s;-webkit-tap-highlight-color:transparent;user-select:none;}
+  .section-title{font-family:'Rajdhani',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:3px;padding:9px 14px;}
+  .s-htf{background:linear-gradient(90deg,#003a50,#001e30);color:var(--teal);border-bottom:1px solid #0d3050;}
+  .s-setup1{background:linear-gradient(90deg,#1a2a00,#0d1500);color:#aaff44;border-bottom:1px solid #0d3050;}
+  .s-setup2{background:linear-gradient(90deg,#003a28,#001e18);color:var(--green);border-bottom:1px solid #0d3050;}
+  .s-valid{background:linear-gradient(90deg,#3a2000,#1e1000);color:var(--gold);border-bottom:1px solid #0d3050;}
+  .s-post{background:linear-gradient(90deg,#2a0030,#150018);color:#cc88ff;border-bottom:1px solid #0d3050;}
+
+  /* ITEM */
+  .item{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;background:var(--card);border-bottom:1px solid #0a2035;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;transition:background .15s;}
   .item:last-child{border-bottom:none;}
-  .item:active{background:#0d2540;}
   .item.checked{background:#071e14;}
-  .item.checked-mental{background:#1a1400;}
   .cb{width:22px;height:22px;border-radius:5px;border:2px solid #1a4a6a;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .2s;font-size:13px;}
   .item.checked .cb{background:var(--green);border-color:var(--green);}
-  .item.checked-mental .cb{background:var(--gold);border-color:var(--gold);color:#1a1000;}
   .item-text{flex:1;}
   .item-label{font-size:.88rem;font-weight:600;color:var(--white);line-height:1.3;}
   .item.checked .item-label{color:var(--green);}
-  .item.checked-mental .item-label{color:var(--gold);}
   .item-desc{font-size:.72rem;color:var(--muted);margin-top:2px;line-height:1.4;}
-  .btn-reset{display:block;margin:14px auto 0;background:transparent;border:1px solid #1a4a6a;color:var(--muted);padding:9px 28px;border-radius:7px;font-family:'Rajdhani',sans-serif;font-size:.8rem;letter-spacing:2px;cursor:pointer;transition:all .2s;}
-  .btn-reset:hover{border-color:var(--teal);color:var(--teal);}
-  .save-indicator{text-align:center;margin-top:10px;font-size:.65rem;color:var(--muted);font-family:'Rajdhani',sans-serif;letter-spacing:2px;opacity:0;transition:opacity .3s;}
+
+  /* VIEWS */
+  .setup-view{display:none;}
+  .setup-view.active{display:block;}
+
+  /* RESET */
+  .btn-reset{display:block;margin:14px auto 0;background:transparent;border:1px solid #1a4a6a;color:var(--muted);padding:9px 28px;border-radius:7px;font-family:'Rajdhani',sans-serif;font-size:.8rem;letter-spacing:2px;cursor:pointer;}
+  .save-indicator{text-align:center;margin-top:10px;font-size:.65rem;color:var(--green);font-family:'Rajdhani',sans-serif;letter-spacing:2px;opacity:0;transition:opacity .3s;}
   .save-indicator.show{opacity:1;}
+
+  /* SETUP LABEL */
+  .setup-label{margin:14px 14px 0;padding:10px 14px;border-radius:8px;font-family:'Rajdhani',sans-serif;font-size:.78rem;font-weight:700;letter-spacing:2px;text-align:center;}
+  .label-a{background:rgba(0,180,216,.1);border:1px solid var(--teal);color:var(--teal);}
+  .label-b{background:rgba(0,200,150,.1);border:1px solid var(--green);color:var(--green);}
 </style>
 </head>
 <body>
+
 <header>
   <div class="brand">⚡ BBS</div>
-  <div class="subtitle">BIG-BOY SHOOTER — CHECKLIST PRE-TRADE</div>
+  <div class="subtitle">CHECKLIST SNIPER — BIG-BOY SHOOTER</div>
   <div class="devise">🎯 ONE SHOT. ONE KILL. ONE GOAL.</div>
 </header>
 
+<!-- SETUP SELECTOR -->
+<div class="setup-selector">
+  <div class="setup-btn active-a" id="btn-a" onclick="switchSetup('a')">📐 SETUP 1<br><small style="font-size:.65rem;letter-spacing:1px;">PULLBACK</small></div>
+  <div class="setup-btn" id="btn-b" onclick="switchSetup('b')">🔄 SETUP 2<br><small style="font-size:.65rem;letter-spacing:1px;">CONTINUATION</small></div>
+</div>
+
+<!-- INFO BAR -->
 <div class="info-bar">
   <input type="date" id="tradeDate"/>
   <select id="actif"><option value="">📊 Actif...</option><option>V75</option><option>V50 (1s)</option><option>V100</option><option>Step Index</option></select>
-  <select id="biais"><option value="">🧭 Biais D1...</option><option>Bullish 📈</option><option>Bearish 📉</option></select>
   <select id="direction"><option value="">📈 Direction...</option><option>BUY</option><option>SELL</option></select>
 </div>
 
+<!-- PROGRESS -->
 <div class="progress-wrap">
   <div class="progress-header">
     <span class="progress-label">CHECKLIST COMPLÉTÉE</span>
-    <span class="progress-count" id="countDisplay">0 / 11</span>
+    <span class="progress-count" id="countDisplay">0 / 0</span>
   </div>
   <div class="bar-bg"><div class="bar-fill" id="barFill"></div></div>
 </div>
 
+<!-- STATUS -->
 <div class="status-wrap">
   <div class="status-badge badge-wait" id="statusBadge">⏳ EN ATTENTE</div>
 </div>
 
-<div class="section">
-  <div class="section-title entry">🎯 CONFIRMATION D'ENTRÉE</div>
-  <div class="item" data-type="entry" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Biais D1 confirmé (BOS)</div><div class="item-desc">Structure Daily clairement bullish ou bearish — pas d'ambiguïté</div></div></div>
-  <div class="item" data-type="entry" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Structure H1 alignée</div><div class="item-desc">L'intention H1 va dans le même sens que le biais D1</div></div></div>
-  <div class="item" data-type="entry" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">CHoCH confirmé en LTF</div><div class="item-desc">Changement de structure visible sur M5 ou M15</div></div></div>
-  <div class="item" data-type="entry" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">OB valide avec FVG</div><div class="item-desc">FVG présent = OB confirmé. Sans FVG = on skip le trade</div></div></div>
-  <div class="item" data-type="entry" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Prix revenu sur l'OB LTF</div><div class="item-desc">On attend le retour — jamais anticiper l'entrée</div></div></div>
-  <div class="item" data-type="entry" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">R:R minimum 1:3 calculé</div><div class="item-desc">SL derrière OB, TP sur Swing H1 ou Major Swing D1</div></div></div>
+<!-- ══ SETUP A : PULLBACK ══ -->
+<div class="setup-view active" id="view-a">
+  <div class="setup-label label-a">📐 SETUP 1 — PULLBACK (Retracement après BOS Daily)</div>
+
+  <div class="section">
+    <div class="section-title s-htf">🧭 ÉTAPE 1 — BIAIS HTF (Weekly / Daily)</div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">BOS Daily clairement visible</div><div class="item-desc">Haussier ou baissier — pas d'ambiguïté sur le Daily</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Biais directionnel défini (UP ou DOWN)</div><div class="item-desc">Direction claire confirmée sur le Daily</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">OB Daily/Weekly identifié comme zone MÈRE</div><div class="item-desc">La zone mère HTF est clairement marquée sur le graphe</div></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title s-setup1">📐 ÉTAPE 2 — SETUP PULLBACK</div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">CHoCH clair sur H4 ou H1</div><div class="item-desc">Changement de structure visible — pas de doute</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">OB Middle TF (H4/H1) propre qui crée le CHoCH</div><div class="item-desc">L'OB qui a créé le CHoCH est identifié et propre</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Entrée UNIQUEMENT dans cet OB</div><div class="item-desc">Pas d'entrée agressive — attendre la mitigation de l'OB</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">SL défini derrière cet OB</div><div class="item-desc">Stop Loss placé derrière l'OB H4/H1 — pas ailleurs</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">TP = 50% Fibo du range Daily</div><div class="item-desc">Take Profit calculé sur le 50% Fibonacci du range Daily</div></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title s-valid">✅ ÉTAPE 3 — CONDITIONS OBLIGATOIRES</div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Confluence HTF / Middle TF alignée</div><div class="item-desc">Daily + H4/H1 dans le même sens — obligatoire</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">R:R minimum 1:3</div><div class="item-desc">Calculé avant d'entrer — si inférieur à 3 on skip</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Pas de duplication de zone</div><div class="item-desc">La zone n'a pas déjà été mitigée</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Pas d'entrée agressive</div><div class="item-desc">J'attends le retour sur l'OB — jamais anticiper</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Je trade uniquement ce qui est DÉJÀ défini</div><div class="item-desc">Pas de setup inventé en cours de route</div></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title s-post">🏁 ÉTAPE 4 — SORTIE & POST-TRADE</div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">TP partiel INTERDIT sur ce setup</div><div class="item-desc">Setup A = laisser courir jusqu'au TP complet</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Journal rempli après le trade</div><div class="item-desc">Win ou loss — toujours noter immédiatement</div></div></div>
+  </div>
 </div>
 
-<div class="section">
-  <div class="section-title manage">🔒 GESTION DU TRADE</div>
-  <div class="item" data-type="manage" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">1 seule position — pas de split</div><div class="item-desc">One Shot. One Kill. 1 setup = 1 trade, rien de plus</div></div></div>
-  <div class="item" data-type="manage" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Risque ≤ 1/10 du capital</div><div class="item-desc">Calculé avant d'entrer — jamais après</div></div></div>
-  <div class="item" data-type="manage" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Plan BE + partiel défini</div><div class="item-desc">BE à +1R. Partiel 35% à +1.5R. Laisser courir vers D1</div></div></div>
-</div>
+<!-- ══ SETUP B : CONTINUATION ══ -->
+<div class="setup-view" id="view-b">
+  <div class="setup-label label-b">🔄 SETUP 2 — CONTINUATION (dans l'OB Daily/Weekly)</div>
 
-<div class="section">
-  <div class="section-title mental">🧠 ÉTAT MENTAL</div>
-  <div class="item" data-type="mental" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Je suis calme et concentré</div><div class="item-desc">Pas de stress, pas de revenge, pas de FOMO</div></div></div>
-  <div class="item" data-type="mental" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Je respecte mon plan quoi qu'il arrive</div><div class="item-desc">Si ça sort en SL, c'est le marché — pas une erreur</div></div></div>
+  <div class="section">
+    <div class="section-title s-htf">🧭 ÉTAPE 1 — BIAIS HTF (Weekly / Daily)</div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">BOS Daily clairement visible</div><div class="item-desc">Haussier ou baissier — pas d'ambiguïté sur le Daily</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Biais directionnel défini (UP ou DOWN)</div><div class="item-desc">Direction claire confirmée sur le Daily</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">OB Daily/Weekly identifié comme zone MÈRE</div><div class="item-desc">La zone mère HTF est clairement marquée sur le graphe</div></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title s-setup2">🔄 ÉTAPE 2 — SETUP CONTINUATION</div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Prix touche l'OB HTF (Daily/Weekly)</div><div class="item-desc">Le prix est entré dans la zone mère Daily ou Weekly</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Descente en M30/M15 SEULEMENT</div><div class="item-desc">Pas de M5 ou M1 — uniquement M30 ou M15 pour la confirmation</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">CHoCH LTF clair sur M30/M15</div><div class="item-desc">Changement de structure visible et propre en LTF</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">OB LTF propre formé</div><div class="item-desc">L'OB M30/M15 qui a créé le CHoCH est identifiable</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Entrée sur mitigation de l'OB LTF</div><div class="item-desc">Attendre que le prix revienne sur l'OB LTF — jamais anticiper</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">SL derrière l'OB LTF</div><div class="item-desc">Stop Loss placé derrière l'OB M30/M15</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">TP = Swing Daily suivant</div><div class="item-desc">Take Profit sur le prochain swing majeur du Daily</div></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title s-valid">✅ ÉTAPE 3 — CONDITIONS OBLIGATOIRES</div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Confluence HTF / LTF alignée</div><div class="item-desc">Daily/Weekly + M30/M15 dans le même sens — obligatoire</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">R:R minimum 1:3</div><div class="item-desc">Calculé avant d'entrer — si inférieur à 3 on skip</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Pas de duplication de zone</div><div class="item-desc">La zone OB LTF n'a pas déjà été mitigée</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Pas d'entrée agressive</div><div class="item-desc">J'attends toujours la mitigation — jamais anticiper</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Je trade uniquement ce qui est DÉJÀ défini</div><div class="item-desc">Pas de setup inventé en cours de route</div></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title s-post">🏁 ÉTAPE 4 — SORTIE & POST-TRADE</div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">BE passé à +1R</div><div class="item-desc">Déplacer le SL au prix d'entrée dès +1R atteint</div></div></div>
+    <div class="item" onclick="toggle(this)"><div class="cb"></div><div class="item-text"><div class="item-label">Journal rempli après le trade</div><div class="item-desc">Win ou loss — toujours noter immédiatement</div></div></div>
+  </div>
 </div>
 
 <button class="btn-reset" onclick="resetAll()">↺ NOUVEAU TRADE</button>
-<div class="save-indicator" id="saveIndicator">💾 SAUVEGARDÉ</div>
+<div class="save-indicator" id="saveInd">💾 SAUVEGARDÉ</div>
 
 <script>
-  // ── STORAGE : IndexedDB (permanent, survit à la fermeture du navigateur) ──
-  const DB_NAME = 'BBS_DB';
-  const DB_VER  = 1;
-  let db;
+  // ── IndexedDB ──
+  const DB='BBS_CL2_DB'; let db;
+  function openDB(){return new Promise((r,j)=>{const q=indexedDB.open(DB,1);q.onupgradeneeded=e=>{if(!e.target.result.objectStoreNames.contains('kv'))e.target.result.createObjectStore('kv')};q.onsuccess=e=>{db=e.target.result;r()};q.onerror=j});}
+  function dbSet(k,v){return new Promise((r,j)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=r;t.onerror=j});}
+  function dbGet(k){return new Promise((r,j)=>{const q=db.transaction('kv','readonly').objectStore('kv').get(k);q.onsuccess=()=>r(q.result);q.onerror=j});}
 
-  function openDB() {
-    return new Promise((res, rej) => {
-      const req = indexedDB.open(DB_NAME, DB_VER);
-      req.onupgradeneeded = e => {
-        const d = e.target.result;
-        if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
-      };
-      req.onsuccess = e => { db = e.target.result; res(db); };
-      req.onerror   = e => rej(e);
-    });
-  }
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('tradeDate').value=today;
+  let currentSetup='a';
 
-  function dbSet(key, val) {
-    return new Promise((res, rej) => {
-      const tx = db.transaction('kv', 'readwrite');
-      tx.objectStore('kv').put(val, key);
-      tx.oncomplete = res; tx.onerror = rej;
-    });
-  }
-
-  function dbGet(key) {
-    return new Promise((res, rej) => {
-      const tx  = db.transaction('kv', 'readonly');
-      const req = tx.objectStore('kv').get(key);
-      req.onsuccess = () => res(req.result);
-      req.onerror   = rej;
-    });
-  }
-
-  // ── INIT ──
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('tradeDate').value = today;
-
-  openDB().then(async () => {
-    // Restore saved state
-    const state = await dbGet('checklist_state');
-    if (state) {
-      if (state.date)      document.getElementById('tradeDate').value  = state.date;
-      if (state.actif)     document.getElementById('actif').value      = state.actif;
-      if (state.biais)     document.getElementById('biais').value      = state.biais;
-      if (state.direction) document.getElementById('direction').value  = state.direction;
-      const items = document.querySelectorAll('.item');
-      (state.checked || []).forEach((cls, i) => {
-        if (items[i] && cls) {
-          items[i].classList.add(cls);
-          items[i].querySelector('.cb').textContent = cls === 'checked-mental' ? '★' : '✓';
-        }
-      });
-      updateProgress();
+  openDB().then(async()=>{
+    const s=await dbGet('state');
+    if(s){
+      if(s.date)document.getElementById('tradeDate').value=s.date;
+      if(s.actif)document.getElementById('actif').value=s.actif;
+      if(s.direction)document.getElementById('direction').value=s.direction;
+      if(s.setup)switchSetup(s.setup,false);
+      const items=document.querySelectorAll('#view-'+currentSetup+' .item');
+      (s.checked||[]).forEach((c,i)=>{if(items[i]&&c){items[i].classList.add('checked');items[i].querySelector('.cb').textContent='✓';}});
     }
+    updateProgress();
   });
 
-  // Save state
-  async function saveState() {
-    const items = document.querySelectorAll('.item');
-    const checked = Array.from(items).map(item =>
-      item.classList.contains('checked') ? 'checked' :
-      item.classList.contains('checked-mental') ? 'checked-mental' : null
-    );
-    await dbSet('checklist_state', {
-      date: document.getElementById('tradeDate').value,
-      actif: document.getElementById('actif').value,
-      biais: document.getElementById('biais').value,
-      direction: document.getElementById('direction').value,
-      checked
+  async function save(){
+    const items=document.querySelectorAll('#view-'+currentSetup+' .item');
+    await dbSet('state',{
+      date:document.getElementById('tradeDate').value,
+      actif:document.getElementById('actif').value,
+      direction:document.getElementById('direction').value,
+      setup:currentSetup,
+      checked:Array.from(items).map(i=>i.classList.contains('checked')?true:false)
     });
-    const ind = document.getElementById('saveIndicator');
-    ind.classList.add('show');
-    setTimeout(() => ind.classList.remove('show'), 1500);
+    const ind=document.getElementById('saveInd');
+    ind.classList.add('show');setTimeout(()=>ind.classList.remove('show'),1500);
   }
 
-  // Save on field change
-  ['tradeDate','actif','biais','direction'].forEach(id =>
-    document.getElementById(id).addEventListener('change', saveState)
-  );
+  ['tradeDate','actif','direction'].forEach(id=>document.getElementById(id).addEventListener('change',save));
 
-  function toggle(el) {
-    const type = el.dataset.type;
-    const isMental = type === 'mental';
-    const cls = isMental ? 'checked-mental' : 'checked';
-    if (el.classList.contains(cls)) {
-      el.classList.remove(cls);
-      el.querySelector('.cb').textContent = '';
-    } else {
-      el.classList.add(cls);
-      el.querySelector('.cb').textContent = isMental ? '★' : '✓';
-    }
+  function switchSetup(s, doSave=true){
+    currentSetup=s;
+    document.querySelectorAll('.setup-view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+s).classList.add('active');
+    document.getElementById('btn-a').className='setup-btn'+(s==='a'?' active-a':'');
+    document.getElementById('btn-b').className='setup-btn'+(s==='b'?' active-b':'');
     updateProgress();
-    saveState();
+    if(doSave)save();
   }
 
-  function updateProgress() {
-    const items = document.querySelectorAll('.item');
-    let checked = 0;
-    items.forEach(item => {
-      if (item.classList.contains('checked') || item.classList.contains('checked-mental')) checked++;
-    });
-    const pct = (checked / 11) * 100;
-    document.getElementById('barFill').style.width = pct + '%';
-    document.getElementById('countDisplay').textContent = checked + ' / 11';
-    const badge = document.getElementById('statusBadge');
-    const blockers = document.querySelectorAll('[data-type="entry"], [data-type="manage"]');
-    const allBlockers = Array.from(blockers).every(b => b.classList.contains('checked'));
-    if (checked === 0) {
-      badge.className = 'status-badge badge-wait'; badge.textContent = '⏳ EN ATTENTE';
-    } else if (allBlockers && checked === 11) {
-      badge.className = 'status-badge badge-ready'; badge.textContent = '🎯 FEU VERT — ENTRE !';
-    } else if (allBlockers) {
-      badge.className = 'status-badge badge-almost'; badge.textContent = '⚡ PRESQUE PRÊT';
-    } else {
-      badge.className = 'status-badge badge-wait'; badge.textContent = '🔍 EN COURS...';
-    }
+  function toggle(el){
+    el.classList.toggle('checked');
+    el.querySelector('.cb').textContent=el.classList.contains('checked')?'✓':'';
+    updateProgress();save();
   }
 
-  async function resetAll() {
-    document.querySelectorAll('.item').forEach(item => {
-      item.classList.remove('checked','checked-mental');
-      item.querySelector('.cb').textContent = '';
-    });
-    ['actif','biais','direction'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('tradeDate').value = today;
-    updateProgress();
-    await saveState();
+  function updateProgress(){
+    const items=document.querySelectorAll('#view-'+currentSetup+' .item');
+    const total=items.length;
+    let checked=0;
+    items.forEach(i=>{if(i.classList.contains('checked'))checked++;});
+    const pct=total>0?(checked/total*100):0;
+    document.getElementById('barFill').style.width=pct+'%';
+    document.getElementById('countDisplay').textContent=checked+' / '+total;
+    const badge=document.getElementById('statusBadge');
+    if(checked===0){badge.className='status-badge badge-wait';badge.textContent='⏳ EN ATTENTE';}
+    else if(checked===total){badge.className='status-badge badge-ready';badge.textContent='🎯 FEU VERT — ENTRE !';}
+    else if(checked>=total*0.7){badge.className='status-badge badge-almost';badge.textContent='⚡ PRESQUE PRÊT';}
+    else{badge.className='status-badge badge-wait';badge.textContent='🔍 EN COURS...';}
+  }
+
+  async function resetAll(){
+    document.querySelectorAll('.item').forEach(i=>{i.classList.remove('checked');i.querySelector('.cb').textContent='';});
+    ['actif','direction'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('tradeDate').value=today;
+    updateProgress();await save();
   }
 
   updateProgress();
