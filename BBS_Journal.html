@@ -141,6 +141,7 @@
       <div class="field"><label>RÉSULTAT</label><select id="f-result"><option value="">Choisir...</option><option>WIN ✅</option><option>LOSS ❌</option><option>BE ➡️</option></select></div>
       <div class="field"><label>R RÉALISÉ</label><div style="display:flex;gap:6px;align-items:center;"><button type="button" id="btn-minus" onclick="setRSign(-1)" style="background:#3a0010;border:2px solid var(--red);color:var(--red);padding:8px 14px;border-radius:7px;font-family:Rajdhani,sans-serif;font-weight:700;font-size:1.1rem;cursor:pointer;flex-shrink:0;">−</button><input type="number" id="f-r" placeholder="3.0" step="0.1" min="0" style="flex:1;text-align:center;"/><button type="button" id="btn-plus" onclick="setRSign(1)" style="background:#003a28;border:2px solid var(--green);color:var(--green);padding:8px 14px;border-radius:7px;font-family:Rajdhani,sans-serif;font-weight:700;font-size:1.1rem;cursor:pointer;flex-shrink:0;">+</button></div><div id="r-preview" style="font-size:.72rem;color:var(--muted);margin-top:3px;font-family:Rajdhani,sans-serif;letter-spacing:1px;text-align:center;min-height:14px;"></div></div>
       <div class="field"><label>BE PASSÉ ?</label><select id="f-be"><option value="">—</option><option>✅ Oui</option><option>❌ Non</option></select></div>
+      <div class="field" id="raison-wrap" style="display:none"><label>RAISON DE LA PERTE</label><select id="f-raison"><option value="">Sélectionner...</option><optgroup label="🧭 Biais"><option>Biais D1 mal lu</option><option>Mauvaise lecture de structure</option></optgroup><optgroup label="🎯 Entrée"><option>Entrée sans CHoCH confirmé</option><option>OB pas encore mitigé — anticipation</option><option>OB déjà mitigé — zone invalide</option><option>Pas de confluence HTF/LTF</option></optgroup><optgroup label="⚙️ Gestion"><option>SL trop serré</option><option>Split de positions</option><option>TP modifié en cours de trade</option></optgroup><optgroup label="🧠 Mental"><option>Setup forcé — pas dans le plan</option><option>Revenge trade après une perte</option><option>FOMO — entré trop tard</option></optgroup></select></div>
     </div>
     <div class="row2">
       <div class="field"><label>PARTIEL PRIS ?</label><select id="f-partial"><option value="">—</option><option>✅ Oui</option><option>❌ Non</option></select></div>
@@ -286,6 +287,13 @@
     if(name==='stats')renderStats();
   }
 
+  // Show raison only on LOSS
+  document.getElementById('f-result').addEventListener('change', function(){
+    const wrap = document.getElementById('raison-wrap');
+    wrap.style.display = this.value.includes('LOSS') ? 'flex' : 'none';
+    if(!this.value.includes('LOSS')) document.getElementById('f-raison').value='';
+  });
+
   function calcRR(){
     const e=parseFloat(document.getElementById('f-entry').value);
     const sl=parseFloat(document.getElementById('f-sl').value);
@@ -307,10 +315,10 @@
     const tp=document.getElementById('f-tp').value;
     let rr='—';
     if(entry&&sl&&tp&&sl!==entry)rr=Math.abs((tp-entry)/(entry-sl)).toFixed(2)+'R';
-    const trade={id:Date.now(),date,actif,biais:document.getElementById('f-biais').value,direction:document.getElementById('f-direction').value,entry,sl,tp,rr,setup:document.getElementById('f-setup').value,typeSetup:document.getElementById('f-type').value,ltf:document.getElementById('f-ltf').value,result,rReal:(()=>{const v=parseFloat(document.getElementById('f-r').value);return isNaN(v)?'':String(rSign*v);})(),be:document.getElementById('f-be').value,partial:document.getElementById('f-partial').value,note:document.getElementById('f-note').value};
+    const trade={id:Date.now(),date,actif,biais:document.getElementById('f-biais').value,direction:document.getElementById('f-direction').value,entry,sl,tp,rr,setup:document.getElementById('f-setup').value,typeSetup:document.getElementById('f-type').value,ltf:document.getElementById('f-ltf').value,result,rReal:(()=>{const v=parseFloat(document.getElementById('f-r').value);return isNaN(v)?'':String(rSign*v);})(),be:document.getElementById('f-be').value,raison:document.getElementById('f-raison').value,partial:document.getElementById('f-partial').value,note:document.getElementById('f-note').value};
     await dbPut(trade);
     trades.unshift(trade);
-    ['f-actif','f-biais','f-direction','f-setup','f-type','f-ltf','f-result','f-be','f-partial'].forEach(id=>document.getElementById(id).value='');
+    ['f-actif','f-biais','f-direction','f-setup','f-type','f-ltf','f-result','f-be','f-raison','f-partial'].forEach(id=>document.getElementById(id).value='');document.getElementById('raison-wrap').style.display='none';
     ['f-entry','f-sl','f-tp','f-r','f-note'].forEach(id=>document.getElementById(id).value='');rSign=1;document.getElementById('btn-plus').style.background='#003a28';document.getElementById('btn-plus').style.color='var(--green)';document.getElementById('btn-minus').style.background='#3a0010';document.getElementById('btn-minus').style.color='var(--red)';document.getElementById('r-preview').textContent='';
     document.getElementById('f-date').value=today;
     document.getElementById('rr-display').textContent='—';
@@ -328,7 +336,8 @@
       const rCol=parseFloat(t.rReal)>0?'green':parseFloat(t.rReal)<0?'red':'gold';
       const dCol=t.direction==='BUY'?'green':t.direction==='SELL'?'red':'teal';
       return `<div class="trade-card ${rc}"><div class="card-header"><div class="card-left"><div class="card-actif">${t.actif||'—'}</div><div class="card-date">${t.date||''}</div></div><div class="card-result ${rb}">${t.result}</div></div><div class="card-body"><div class="card-stat"><div class="stat-label">BIAIS D1</div><div class="stat-value">${t.biais||'—'}</div></div>
-          <div class="card-stat" style="grid-column:span 2"><div class="stat-label">TYPE SETUP</div><div class="stat-value teal">${t.typeSetup||'—'}</div></div><div class="card-stat"><div class="stat-label">DIRECTION</div><div class="stat-value ${dCol}">${t.direction||'—'}</div></div><div class="card-stat"><div class="stat-label">R:R</div><div class="stat-value teal">${t.rr}</div></div><div class="card-stat"><div class="stat-label">R RÉALISÉ</div><div class="stat-value ${rCol}">${t.rReal?(parseFloat(t.rReal)>0?'+':'')+parseFloat(t.rReal).toFixed(1)+'R':'—'}</div></div><div class="card-stat"><div class="stat-label">BE</div><div class="stat-value">${t.be||'—'}</div></div><div class="card-stat"><div class="stat-label">PARTIEL</div><div class="stat-value">${t.partial||'—'}</div></div></div>${t.note?`<div class="card-note">💬 ${t.note}</div>`:''}<div class="card-footer"><button class="btn-del" onclick="deleteTrade(${t.id})">SUPPRIMER</button></div></div>`;
+          <div class="card-stat" style="grid-column:span 2"><div class="stat-label">TYPE SETUP</div><div class="stat-value teal">${t.typeSetup||'—'}</div></div><div class="card-stat"><div class="stat-label">DIRECTION</div><div class="stat-value ${dCol}">${t.direction||'—'}</div></div><div class="card-stat"><div class="stat-label">R:R</div><div class="stat-value teal">${t.rr}</div></div><div class="card-stat"><div class="stat-label">R RÉALISÉ</div><div class="stat-value ${rCol}">${t.rReal?(parseFloat(t.rReal)>0?'+':'')+parseFloat(t.rReal).toFixed(1)+'R':'—'}</div></div><div class="card-stat"><div class="stat-label">BE</div><div class="stat-value">${t.be||'—'}</div></div><div class="card-stat"><div class="stat-label">PARTIEL</div><div class="stat-value">${t.partial||'—'}</div></div></div>${t.raison?`<div class="card-note" style="color:var(--red)">❌ ${t.raison}</div>`:''}
+        ${t.note?`<div class="card-note">💬 ${t.note}</div>`:''}<div class="card-footer"><button class="btn-del" onclick="deleteTrade(${t.id})">SUPPRIMER</button></div></div>`;
     }).join('');
   }
 
