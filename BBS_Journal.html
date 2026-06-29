@@ -116,7 +116,7 @@
     <div class="form-title">📅 INFORMATIONS DU TRADE</div>
     <div class="row2">
       <div class="field"><label>DATE</label><input type="date" id="f-date"/></div>
-      <div class="field"><label>ACTIF</label><select id="f-actif"><option value="">Choisir...</option><option>V75</option><option>V50 (1s)</option><option>V100</option><option>Step Index</option></select></div>
+      <div class="field"><label>ACTIF</label><select id="f-actif"><option value="">Choisir...</option><optgroup label="📊 Indices Synthétiques"><option>V10</option><option>V75</option><option>V50 (1s)</option><option>V100</option><option>Step Index</option></optgroup><optgroup label="💱 Forex"><option>EURUSD</option><option>GBPUSD</option></optgroup></select></div>
     </div>
     <div class="row2">
       <div class="field"><label>BIAIS D1</label><select id="f-biais"><option value="">Choisir...</option><option>Bullish 📈</option><option>Bearish 📉</option></select></div>
@@ -409,7 +409,7 @@
     }).filter(Boolean);
     setupEl.innerHTML=setupRows.length?setupRows.join(''):'<div class="no-trades">Aucun trade enregistré</div>';
 
-    const actifs=['V75','V50 (1s)','V100','Step Index'];
+    const actifs=['V10','V75','V50 (1s)','V100','Step Index','EURUSD','GBPUSD'];
     const actifEl=document.getElementById('s-actifs');
     const rows=actifs.map(a=>{
       const at=trades.filter(t=>t.actif===a);
