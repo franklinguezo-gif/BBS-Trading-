@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suivi Pronostics — Score Exact</title>
+<style>
+  :root{
+    --bg:#0d0f12;
+    --panel:#15181d;
+    --panel-2:#1b1f26;
+    --line:#262b33;
+    --text:#e9e7e2;
+    --muted:#8b93a1;
+    --accent:#34d399;
+    --bad:#f4685b;
+    --warn:#e0a83e;
+    --mono:'JetBrains Mono', 'Courier New', monospace;
+    --sans:'Inter', -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);margin:0;padding:24px 16px 60px;}
+  .wrap{max-width:980px;margin:0 auto;}
+  header{margin-bottom:24px;}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 6px;}
+  h1{font-size:22px;margin:0 0 4px;font-weight:700;}
+  .sub{color:var(--muted);font-size:13px;margin:0;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:18px;}
+  .panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 14px;font-weight:600;}
+  .panel .hint{font-size:12px;color:var(--muted);margin:-8px 0 14px;}
+
+  form{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:10px;align-items:end;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:11px;color:var(--muted);}
+  .score-pair{display:flex;align-items:center;gap:6px;}
+  .score-pair input{width:44px;text-align:center;font-family:var(--mono);}
+  .score-pair span{color:var(--muted);}
+  input, select{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:8px 9px;font-size:13px;font-family:var(--sans);}
+  input:focus,select:focus{outline:1px solid var(--accent);border-color:var(--accent);}
+  button{background:var(--accent);color:#06231a;border:none;border-radius:6px;padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;}
+  button:hover{opacity:.9;}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:500;}
+
+  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .stat-card{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;}
+  .stat-num{font-family:var(--mono);font-size:24px;font-weight:700;}
+  .stat-label{font-size:11px;color:var(--muted);margin-top:2px;}
+  .stat-num.good{color:var(--accent);}
+  .stat-num.bad{color:var(--bad);}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  td{padding:9px 6px;border-bottom:1px solid var(--line);}
+  tr:last-child td{border-bottom:none;}
+  .score{font-family:var(--mono);font-weight:600;}
+  .pct{font-family:var(--mono);font-size:12px;}
+  .pct.hi{color:var(--accent);font-weight:700;}
+  .pct.lo{color:var(--muted);}
+  .reco{
+    display:inline-block;font-family:var(--mono);font-size:12px;font-weight:700;
+    background:rgba(52,211,153,.12);color:var(--accent);padding:3px 9px;border-radius:20px;
+  }
+  .reco.weak{background:var(--panel-2);color:var(--muted);font-weight:500;}
+  .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;font-family:var(--mono);}
+  .tag.exact{background:rgba(52,211,153,.15);color:var(--accent);}
+  .tag.partial{background:rgba(224,168,62,.15);color:var(--warn);}
+  .tag.miss{background:rgba(244,104,91,.15);color:var(--bad);}
+  .del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 6px;}
+  .del-btn:hover{color:var(--bad);}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:24px 0;}
+  .top-actions{display:flex;justify-content:flex-end;margin-bottom:10px;}
+  .table-scroll{overflow-x:auto;}
+  .form-msg{grid-column:1/-1;font-size:12px;padding:8px 10px;border-radius:6px;display:none;}
+  .form-msg.error{background:rgba(244,104,91,.12);color:var(--bad);display:block;}
+  .form-msg.ok{background:rgba(52,211,153,.12);color:var(--accent);display:block;}
+  .banner{background:rgba(224,168,62,.12);color:var(--warn);border:1px solid var(--warn);border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:18px;display:none;}
+  @media(max-width:640px){
+    form{grid-template-columns:1fr 1fr;}
+    .stats-grid{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">BBS · Suivi externe</p>
+    <h1>Suivi Pronostics — Score Exact</h1>
+    <p class="sub">Chaque pronostic loupé cache souvent un marché fiable (double chance, over/under, BTTS). Ce tableau le trouve pour toi.</p>
+  </header>
+
+  <div class="banner" id="storage-banner">⚠️ Le stockage automatique n'est pas disponible ici — les matchs restent visibles pendant cette session mais ne seront pas gardés si tu fermes la page.</div>
+
+  <div class="panel">
+    <h2>Nouveau match</h2>
+    <form id="entry-form" novalidate>
+      <div class="field">
+        <label>Pays / Championnat</label>
+        <input type="text" id="f-pays" placeholder="ex: Angleterre">
+      </div>
+      <div class="field">
+        <label>Pronostic reçu (dom - ext)</label>
+        <div class="score-pair">
+          <input type="number" min="0" inputmode="numeric" id="f-pred-h" placeholder="4">
+          <span>–</span>
+          <input type="number" min="0" inputmode="numeric" id="f-pred-a" placeholder="1">
+        </div>
+      </div>
+      <div class="field">
+        <label>Score réel (dom - ext)</label>
+        <div class="score-pair">
+          <input type="number" min="0" inputmode="numeric" id="f-real-h" placeholder="3">
+          <span>–</span>
+          <input type="number" min="0" inputmode="numeric" id="f-real-a" placeholder="2">
+        </div>
+      </div>
+      <button type="submit">Ajouter</button>
+      <p class="form-msg" id="form-msg"></p>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>Vue d'ensemble</h2>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-num" id="s-total">0</div><div class="stat-label">Matchs suivis</div></div>
+      <div class="stat-card"><div class="stat-num good" id="s-exact">0%</div><div class="stat-label">Score exact</div></div>
+      <div class="stat-card"><div class="stat-num" id="s-issue">0%</div><div class="stat-label">Résultat (1N2) correct</div></div>
+      <div class="stat-card"><div class="stat-num bad" id="s-miss">0%</div><div class="stat-label">Complètement raté</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Analyse par pronostic — quelle option jouer quand tu vois ce score</h2>
+    <p class="hint">Pour chaque score annoncé par l'appli, on regarde ce qui s'est réellement passé et on repère le marché le plus souvent gagnant (double chance, over/under, BTTS). Recommandation affichée à partir de 3 cas.</p>
+    <div class="table-scroll" id="pattern-table"></div>
+  </div>
+
+  <div class="panel">
+    <div class="top-actions"><button class="ghost" id="reset-btn">Réinitialiser tout</button></div>
+    <h2>Historique</h2>
+    <div id="table-wrap"></div>
+  </div>
+</div>
+
+<script>
+const STORE_KEY = 'pronostics:entries';
+let entries = [];
+
+function outcome(ph, pa, rh, ra){
+  if(ph===rh && pa===ra) return 'exact';
+  const predSign = Math.sign(ph-pa);
+  const realSign = Math.sign(rh-ra);
+  if(predSign === realSign) return 'partial';
+  return 'miss';
+}
+
+function winnerCode(h,a){
+  if(h>a) return '1';
+  if(h<a) return '2';
+  return 'N';
+}
+
+// For a given real result, which markets hit
+function marketsHit(realH, realA){
+  const w = winnerCode(realH, realA);
+  const total = realH + realA;
+  const btts = realH>0 && realA>0;
+  return {
+    '1X': w==='1' || w==='N',
+    '12': w!=='N',
+    'X2': w==='2' || w==='N',
+    '+1.5': total>=2,
+    '+2.5': total>=3,
+    '-2.5': total<=2,
+    'BTTS Oui': btts,
+    'BTTS Non': !btts
+  };
+}
+
+const MARKET_KEYS = ['1X','12','X2','+1.5','+2.5','-2.5','BTTS Oui','BTTS Non'];
+
+const hasStorage = typeof window !== 'undefined' && !!window.storage && typeof window.storage.get === 'function';
+
+async function loadEntries(){
+  if(!hasStorage){
+    document.getElementById('storage-banner').style.display = 'block';
+    entries = [];
+    render();
+    return;
+  }
+  try{
+    const res = await window.storage.get(STORE_KEY, false);
+    entries = res ? JSON.parse(res.value) : [];
+  }catch(e){ entries = []; }
+  render();
+}
+
+async function saveEntries(){
+  if(!hasStorage) return;
+  try{ await window.storage.set(STORE_KEY, JSON.stringify(entries), false); }
+  catch(e){ console.error('Erreur de sauvegarde', e); }
+}
+
+function render(){
+  renderStats();
+  renderPatternTable();
+  renderTable();
+}
+
+function renderStats(){
+  const total = entries.length;
+  document.getElementById('s-total').textContent = total;
+  if(total===0){
+    document.getElementById('s-exact').textContent='0%';
+    document.getElementById('s-issue').textContent='0%';
+    document.getElementById('s-miss').textContent='0%';
+    return;
+  }
+  const exact = entries.filter(e=>e.result==='exact').length;
+  const partial = entries.filter(e=>e.result==='partial').length;
+  const miss = entries.filter(e=>e.result==='miss').length;
+  document.getElementById('s-exact').textContent = Math.round(exact/total*100)+'%';
+  document.getElementById('s-issue').textContent = Math.round((exact+partial)/total*100)+'%';
+  document.getElementById('s-miss').textContent = Math.round(miss/total*100)+'%';
+}
+
+function renderPatternTable(){
+  const el = document.getElementById('pattern-table');
+  if(entries.length===0){
+    el.innerHTML = '<p class="empty">Ajoute des matchs pour voir apparaître les patterns par pronostic.</p>';
+    return;
+  }
+  const groups = {};
+  entries.forEach(e=>{
+    const key = `${e.predH}-${e.predA}`;
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(e);
+  });
+
+  const rows = Object.keys(groups).map(key=>{
+    const list = groups[key];
+    const n = list.length;
+    const counts = {};
+    MARKET_KEYS.forEach(k=>counts[k]=0);
+    list.forEach(e=>{
+      const hits = marketsHit(e.realH, e.realA);
+      MARKET_KEYS.forEach(k=>{ if(hits[k]) counts[k]++; });
+    });
+    const pct = {};
+    MARKET_KEYS.forEach(k=>{ pct[k] = Math.round(counts[k]/n*100); });
+
+    // best market(s): highest pct, exclude trivial complements tie by picking single best
+    let best = MARKET_KEYS.reduce((a,b)=> pct[b]>pct[a] ? b : a, MARKET_KEYS[0]);
+    const bestPct = pct[best];
+    const enoughData = n>=3;
+
+    return {key, n, pct, best, bestPct, enoughData};
+  }).sort((a,b)=> b.n - a.n);
+
+  const header = `<tr><th>Pronostic</th><th>Nb</th>${MARKET_KEYS.map(k=>`<th>${k}</th>`).join('')}<th>Option conseillée</th></tr>`;
+  const body = rows.map(r=>{
+    const cells = MARKET_KEYS.map(k=>{
+      const cls = r.pct[k]>=70 ? 'hi' : 'lo';
+      return `<td class="pct ${cls}">${r.pct[k]}%</td>`;
+    }).join('');
+    const reco = r.enoughData
+      ? `<span class="reco">${r.best} (${r.bestPct}%)</span>`
+      : `<span class="reco weak">encore peu de données</span>`;
+    return `<tr><td class="score">${r.key}</td><td>${r.n}</td>${cells}<td>${reco}</td></tr>`;
+  }).join('');
+
+  el.innerHTML = `<table><thead>${header}</thead><tbody>${body}</tbody></table>`;
+}
+
+function renderTable(){
+  const el = document.getElementById('table-wrap');
+  if(entries.length===0){
+    el.innerHTML = '<p class="empty">Aucun match enregistré pour le moment.</p>';
+    return;
+  }
+  const tagLabel = {exact:'Exact', partial:'Résultat OK', miss:'Raté'};
+  const rowsHtml = entries.slice().reverse().map((e)=>{
+    const idx = entries.indexOf(e);
+    return `
+    <tr>
+      <td>${escapeHtml(e.pays)}</td>
+      <td class="score">${e.predH}–${e.predA}</td>
+      <td class="score">${e.realH}–${e.realA}</td>
+      <td><span class="tag ${e.result}">${tagLabel[e.result]}</span></td>
+      <td><button class="del-btn" data-idx="${idx}">✕</button></td>
+    </tr>`;
+  }).join('');
+  el.innerHTML = `
+    <table>
+      <thead><tr><th>Pays</th><th>Pronostic</th><th>Score réel</th><th>Résultat</th><th></th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+  `;
+  el.querySelectorAll('.del-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const idx = parseInt(btn.dataset.idx, 10);
+      entries.splice(idx,1);
+      await saveEntries();
+      render();
+    });
+  });
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function showFormMsg(text, type){
+  const msg = document.getElementById('form-msg');
+  msg.textContent = text;
+  msg.className = 'form-msg ' + type;
+}
+function clearFormMsg(){
+  const msg = document.getElementById('form-msg');
+  msg.textContent = '';
+  msg.className = 'form-msg';
+}
+
+document.getElementById('entry-form').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  ev.stopPropagation();
+  try{
+    const pays = document.getElementById('f-pays').value.trim();
+    const predH = parseInt(document.getElementById('f-pred-h').value,10);
+    const predA = parseInt(document.getElementById('f-pred-a').value,10);
+    const realH = parseInt(document.getElementById('f-real-h').value,10);
+    const realA = parseInt(document.getElementById('f-real-a').value,10);
+
+    if(!pays){ showFormMsg('Indique le pays / championnat.', 'error'); return; }
+    if(isNaN(predH) || isNaN(predA)){ showFormMsg('Renseigne le pronostic complet (les deux scores).', 'error'); return; }
+    if(isNaN(realH) || isNaN(realA)){ showFormMsg('Renseigne le score réel complet (les deux scores).', 'error'); return; }
+
+    entries.push({
+      pays, predH, predA, realH, realA,
+      result: outcome(predH,predA,realH,realA),
+      ts: Date.now()
+    });
+    await saveEntries();
+    render();
+    ev.target.reset();
+    clearFormMsg();
+    document.getElementById('f-pays').focus();
+  }catch(err){
+    showFormMsg('Erreur : ' + err.message, 'error');
+  }
+});
+
+document.getElementById('reset-btn').addEventListener('click', async ()=>{
+  if(!confirm('Supprimer tous les matchs enregistrés ?')) return;
+  entries = [];
+  await saveEntries();
+  render();
+});
+
+loadEntries();
+</script>
+</body>
+</html>
