@@ -257,12 +257,9 @@ function populateCountryFilter(){
   const select = document.getElementById('country-filter');
   const current = select.value;
   const countries = [...new Set(entries.map(e=>e.pays))].sort();
-  select.innerHTML = countries.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-  if(countries.includes(current)){
-    select.value = current;
-  } else if(countries.length){
-    select.value = countries[0];
-  }
+  select.innerHTML = '<option value="all">Tout</option>' +
+    countries.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  select.value = (current && (current==='all' || countries.includes(current))) ? current : 'all';
 
   const list = document.getElementById('pays-list');
   list.innerHTML = countries.map(c=>`<option value="${escapeHtml(c)}"></option>`).join('');
@@ -272,7 +269,7 @@ function renderPatternTable(){
   const el = document.getElementById('pattern-table');
   populateCountryFilter();
   const filterVal = document.getElementById('country-filter').value;
-  const scoped = filterVal ? entries.filter(e=>e.pays===filterVal) : entries;
+  const scoped = (filterVal === 'all' || !filterVal) ? entries : entries.filter(e=>e.pays===filterVal);
 
   if(scoped.length===0){
     el.innerHTML = '<p class="empty">Aucun match pour ce filtre pour le moment.</p>';
