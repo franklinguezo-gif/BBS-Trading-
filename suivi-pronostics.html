@@ -18,6 +18,18 @@
     --mono:'JetBrains Mono', 'Courier New', monospace;
     --sans:'Inter', -apple-system, sans-serif;
   }
+  [data-theme="light"]{
+    --bg:#f4f5f7;
+    --panel:#ffffff;
+    --panel-2:#eef0f3;
+    --line:#dde1e6;
+    --text:#1a1d23;
+    --muted:#666f7a;
+    --accent:#0e9e6a;
+    --bad:#d6473b;
+    --warn:#b8790f;
+  }
+  body{transition:background .15s ease, color .15s ease;}
   *{box-sizing:border-box;}
   body{background:var(--bg);color:var(--text);font-family:var(--sans);margin:0;padding:24px 16px 60px;}
   .wrap{max-width:980px;margin:0 auto;}
@@ -62,6 +74,10 @@
     background:rgba(52,211,153,.12);color:var(--accent);padding:3px 9px;border-radius:20px;
   }
   .reco.weak{background:var(--panel-2);color:var(--muted);font-weight:500;}
+  .confidence{font-size:10px;font-family:var(--mono);padding:2px 6px;border-radius:20px;margin-left:6px;white-space:nowrap;}
+  .confidence.low{background:rgba(244,104,91,.12);color:var(--bad);}
+  .confidence.mid{background:rgba(224,168,62,.12);color:var(--warn);}
+  .confidence.high{background:rgba(52,211,153,.12);color:var(--accent);}
   .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;font-family:var(--mono);}
   .tag.exact{background:rgba(52,211,153,.15);color:var(--accent);}
   .tag.partial{background:rgba(224,168,62,.15);color:var(--warn);}
@@ -83,20 +99,24 @@
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <p class="eyebrow">BBS · Suivi externe</p>
-    <h1>Suivi Pronostics — Score Exact</h1>
-    <p class="sub">Chaque pronostic loupé cache souvent un marché fiable (double chance, over/under, BTTS). Ce tableau le trouve pour toi.</p>
+  <header style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+    <div>
+      <p class="eyebrow">BBS · Suivi externe</p>
+      <h1>Suivi Pronostics — Score Exact</h1>
+      <p class="sub">Chaque pronostic loupé cache souvent un marché fiable (double chance, over/under, BTTS). Ce tableau le trouve pour toi.</p>
+    </div>
+    <button class="ghost" id="theme-toggle" style="flex-shrink:0;">🌙 Sombre</button>
   </header>
 
-  <div class="banner" id="storage-banner">⚠️ Le stockage automatique n'est pas disponible ici — les matchs restent visibles pendant cette session mais ne seront pas gardés si tu fermes la page.</div>
+  <div class="banner" id="storage-banner">⚠️ Aucun stockage disponible dans ce navigateur (navigation privée ou paramètres bloqués) — les matchs resteront visibles pendant cette session mais ne seront pas gardés si tu fermes la page.</div>
 
   <div class="panel">
     <h2>Nouveau match</h2>
     <form id="entry-form" novalidate>
       <div class="field">
         <label>Pays / Championnat</label>
-        <input type="text" id="f-pays" placeholder="ex: Angleterre">
+        <input type="text" id="f-pays" placeholder="ex: Angleterre" list="pays-list" autocomplete="off">
+        <datalist id="pays-list"></datalist>
       </div>
       <div class="field">
         <label>Pronostic reçu (dom - ext)</label>
@@ -131,12 +151,24 @@
 
   <div class="panel">
     <h2>Analyse par pronostic — quelle option jouer quand tu vois ce score</h2>
-    <p class="hint">Pour chaque score annoncé par l'appli, on regarde ce qui s'est réellement passé et on repère le marché le plus souvent gagnant (double chance, over/under, BTTS). Recommandation affichée à partir de 3 cas.</p>
+    <p class="hint">Pour chaque score annoncé par l'appli, on regarde ce qui s'est réellement passé et on repère le marché le plus souvent gagnant (double chance, over/under, BTTS).</p>
+    <div class="field" style="max-width:220px;margin-bottom:14px;">
+      <label>Filtrer par pays</label>
+      <select id="country-filter"></select>
+    </div>
     <div class="table-scroll" id="pattern-table"></div>
   </div>
 
   <div class="panel">
-    <div class="top-actions"><button class="ghost" id="reset-btn">Réinitialiser tout</button></div>
+    <div class="top-actions" style="justify-content:space-between;">
+      <div>
+        <button class="ghost" id="export-btn">Exporter (sauvegarde)</button>
+        <button class="ghost" id="import-btn">Importer</button>
+      </div>
+      <button class="ghost" id="reset-btn">Réinitialiser tout</button>
+    </div>
+    <textarea id="import-area" style="display:none;width:100%;height:120px;margin-bottom:12px;background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px;font-family:var(--mono);font-size:11px;" placeholder="Colle ici le JSON exporté, puis clique Confirmer l'import"></textarea>
+    <button class="ghost" id="confirm-import-btn" style="display:none;margin-bottom:14px;">Confirmer l'import</button>
     <h2>Historique</h2>
     <div id="table-wrap"></div>
   </div>
@@ -179,26 +211,44 @@ function marketsHit(realH, realA){
 
 const MARKET_KEYS = ['1X','12','X2','+1.5','+2.5','-2.5','BTTS Oui','BTTS Non'];
 
-const hasStorage = typeof window !== 'undefined' && !!window.storage && typeof window.storage.get === 'function';
+const hasClaudeStorage = typeof window !== 'undefined' && !!window.storage && typeof window.storage.get === 'function';
+
+function hasLocalStorage(){
+  try{
+    const t = '__bbs_test__';
+    localStorage.setItem(t, '1');
+    localStorage.removeItem(t);
+    return true;
+  }catch(e){ return false; }
+}
+const hasLocal = !hasClaudeStorage && hasLocalStorage();
 
 async function loadEntries(){
-  if(!hasStorage){
+  if(hasClaudeStorage){
+    try{
+      const res = await window.storage.get(STORE_KEY, false);
+      entries = res ? JSON.parse(res.value) : [];
+    }catch(e){ entries = []; }
+  } else if(hasLocal){
+    try{
+      const raw = localStorage.getItem(STORE_KEY);
+      entries = raw ? JSON.parse(raw) : [];
+    }catch(e){ entries = []; }
+  } else {
     document.getElementById('storage-banner').style.display = 'block';
     entries = [];
-    render();
-    return;
   }
-  try{
-    const res = await window.storage.get(STORE_KEY, false);
-    entries = res ? JSON.parse(res.value) : [];
-  }catch(e){ entries = []; }
   render();
 }
 
 async function saveEntries(){
-  if(!hasStorage) return;
-  try{ await window.storage.set(STORE_KEY, JSON.stringify(entries), false); }
-  catch(e){ console.error('Erreur de sauvegarde', e); }
+  if(hasClaudeStorage){
+    try{ await window.storage.set(STORE_KEY, JSON.stringify(entries), false); }
+    catch(e){ console.error('Erreur de sauvegarde', e); }
+  } else if(hasLocal){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(entries)); }
+    catch(e){ console.error('Erreur de sauvegarde locale', e); }
+  }
 }
 
 function render(){
@@ -224,14 +274,47 @@ function renderStats(){
   document.getElementById('s-miss').textContent = Math.round(miss/total*100)+'%';
 }
 
+function confidenceLevel(n){
+  if(n>=15) return {cls:'high', label:'fiable'};
+  if(n>=8) return {cls:'mid', label:'à surveiller'};
+  return {cls:'low', label:'signal faible'};
+}
+
+function populateCountryFilter(){
+  const select = document.getElementById('country-filter');
+  const current = select.value;
+  const countries = [...new Set(entries.map(e=>e.pays))].sort();
+  select.innerHTML = countries.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  if(countries.includes(current)){
+    select.value = current;
+  } else if(countries.length){
+    select.value = countries[0];
+  }
+
+  const list = document.getElementById('pays-list');
+  list.innerHTML = countries.map(c=>`<option value="${escapeHtml(c)}"></option>`).join('');
+}
+
 function renderPatternTable(){
   const el = document.getElementById('pattern-table');
-  if(entries.length===0){
-    el.innerHTML = '<p class="empty">Ajoute des matchs pour voir apparaître les patterns par pronostic.</p>';
+  populateCountryFilter();
+  const filterVal = document.getElementById('country-filter').value;
+  const scoped = filterVal ? entries.filter(e=>e.pays===filterVal) : entries;
+
+  if(scoped.length===0){
+    el.innerHTML = '<p class="empty">Aucun match pour ce filtre pour le moment.</p>';
     return;
   }
+
+  // Taux de référence global : moyenne de chaque marché toutes prédictions confondues (dans le scope filtré)
+  const baseline = {};
+  MARKET_KEYS.forEach(k=>{
+    const hitsCount = scoped.filter(e=>marketsHit(e.realH,e.realA)[k]).length;
+    baseline[k] = Math.round(hitsCount/scoped.length*100);
+  });
+
   const groups = {};
-  entries.forEach(e=>{
+  scoped.forEach(e=>{
     const key = `${e.predH}-${e.predA}`;
     if(!groups[key]) groups[key] = [];
     groups[key].push(e);
@@ -249,27 +332,39 @@ function renderPatternTable(){
     const pct = {};
     MARKET_KEYS.forEach(k=>{ pct[k] = Math.round(counts[k]/n*100); });
 
-    // best market(s): highest pct, exclude trivial complements tie by picking single best
-    let best = MARKET_KEYS.reduce((a,b)=> pct[b]>pct[a] ? b : a, MARKET_KEYS[0]);
+    // meilleur marché = celui qui dépasse le plus sa moyenne de référence (pas juste le plus haut en absolu)
+    let best = MARKET_KEYS.reduce((a,b)=> (pct[b]-baseline[b]) > (pct[a]-baseline[a]) ? b : a, MARKET_KEYS[0]);
     const bestPct = pct[best];
-    const enoughData = n>=3;
+    const bestDelta = bestPct - baseline[best];
+    const conf = confidenceLevel(n);
 
-    return {key, n, pct, best, bestPct, enoughData};
+    return {key, n, pct, best, bestPct, bestDelta, conf};
   }).sort((a,b)=> b.n - a.n);
 
   const header = `<tr><th>Pronostic</th><th>Nb</th>${MARKET_KEYS.map(k=>`<th>${k}</th>`).join('')}<th>Option conseillée</th></tr>`;
+
+  const baselineRow = `<tr style="background:var(--panel-2);">
+    <td><em style="color:var(--muted);font-size:12px;">Moyenne générale</em></td>
+    <td>${scoped.length}</td>
+    ${MARKET_KEYS.map(k=>`<td class="pct">${baseline[k]}%</td>`).join('')}
+    <td></td>
+  </tr>`;
+
   const body = rows.map(r=>{
     const cells = MARKET_KEYS.map(k=>{
+      const delta = r.pct[k]-baseline[k];
       const cls = r.pct[k]>=70 ? 'hi' : 'lo';
-      return `<td class="pct ${cls}">${r.pct[k]}%</td>`;
+      const deltaTxt = delta>0 ? `+${delta}` : `${delta}`;
+      const deltaColor = delta>=15 ? 'var(--accent)' : (delta<=-15 ? 'var(--bad)' : 'var(--muted)');
+      return `<td class="pct ${cls}">${r.pct[k]}%<br><span style="font-size:9px;color:${deltaColor}">${deltaTxt} vs moy.</span></td>`;
     }).join('');
-    const reco = r.enoughData
-      ? `<span class="reco">${r.best} (${r.bestPct}%)</span>`
+    const reco = r.n>=3
+      ? `<span class="reco">${r.best} (${r.bestPct}%, ${r.bestDelta>0?'+':''}${r.bestDelta} vs moy.)</span><span class="confidence ${r.conf.cls}">${r.conf.label}</span>`
       : `<span class="reco weak">encore peu de données</span>`;
     return `<tr><td class="score">${r.key}</td><td>${r.n}</td>${cells}<td>${reco}</td></tr>`;
   }).join('');
 
-  el.innerHTML = `<table><thead>${header}</thead><tbody>${body}</tbody></table>`;
+  el.innerHTML = `<table><thead>${header}</thead><tbody>${baselineRow}${body}</tbody></table>`;
 }
 
 function renderTable(){
@@ -344,9 +439,12 @@ document.getElementById('entry-form').addEventListener('submit', async (ev)=>{
     });
     await saveEntries();
     render();
-    ev.target.reset();
+    document.getElementById('f-pred-h').value = '';
+    document.getElementById('f-pred-a').value = '';
+    document.getElementById('f-real-h').value = '';
+    document.getElementById('f-real-a').value = '';
     clearFormMsg();
-    document.getElementById('f-pays').focus();
+    document.getElementById('f-pred-h').focus();
   }catch(err){
     showFormMsg('Erreur : ' + err.message, 'error');
   }
@@ -359,6 +457,68 @@ document.getElementById('reset-btn').addEventListener('click', async ()=>{
   render();
 });
 
+document.getElementById('country-filter').addEventListener('change', renderPatternTable);
+
+document.getElementById('export-btn').addEventListener('click', ()=>{
+  const json = JSON.stringify(entries, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'pronostics-sauvegarde-' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('import-btn').addEventListener('click', ()=>{
+  const area = document.getElementById('import-area');
+  const btn = document.getElementById('confirm-import-btn');
+  const showing = area.style.display === 'block';
+  area.style.display = showing ? 'none' : 'block';
+  btn.style.display = showing ? 'none' : 'block';
+});
+
+document.getElementById('confirm-import-btn').addEventListener('click', async ()=>{
+  const area = document.getElementById('import-area');
+  try{
+    const parsed = JSON.parse(area.value);
+    if(!Array.isArray(parsed)) throw new Error('Format invalide (pas une liste).');
+    entries = parsed;
+    await saveEntries();
+    render();
+    area.value = '';
+    area.style.display = 'none';
+    document.getElementById('confirm-import-btn').style.display = 'none';
+    alert('Import réussi : ' + entries.length + ' matchs chargés.');
+  }catch(err){
+    alert('Erreur d\'import : ' + err.message);
+  }
+});
+
+const THEME_KEY = 'pronostics:theme';
+
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('theme-toggle');
+  btn.textContent = theme === 'light' ? '☀️ Clair' : '🌙 Sombre';
+}
+
+function initTheme(){
+  let saved = 'dark';
+  try{ saved = localStorage.getItem(THEME_KEY) || 'dark'; }catch(e){}
+  applyTheme(saved);
+}
+
+document.getElementById('theme-toggle').addEventListener('click', ()=>{
+  const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const next = current === 'light' ? 'dark' : 'light';
+  applyTheme(next);
+  try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
+});
+
+initTheme();
 loadEntries();
 </script>
 </body>
