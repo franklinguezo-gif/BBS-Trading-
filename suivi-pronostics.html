@@ -139,15 +139,6 @@
     </form>
   </div>
 
-  <div class="panel">
-    <h2>Vue d'ensemble</h2>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-num" id="s-total">0</div><div class="stat-label">Matchs suivis</div></div>
-      <div class="stat-card"><div class="stat-num good" id="s-exact">0%</div><div class="stat-label">Score exact</div></div>
-      <div class="stat-card"><div class="stat-num" id="s-issue">0%</div><div class="stat-label">Résultat (1N2) correct</div></div>
-      <div class="stat-card"><div class="stat-num bad" id="s-miss">0%</div><div class="stat-label">Complètement raté</div></div>
-    </div>
-  </div>
 
   <div class="panel">
     <h2>Analyse par pronostic — quelle option jouer quand tu vois ce score</h2>
@@ -169,7 +160,7 @@
     </div>
     <textarea id="import-area" style="display:none;width:100%;height:120px;margin-bottom:12px;background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px;font-family:var(--mono);font-size:11px;" placeholder="Colle ici le JSON exporté, puis clique Confirmer l'import"></textarea>
     <button class="ghost" id="confirm-import-btn" style="display:none;margin-bottom:14px;">Confirmer l'import</button>
-    <h2>Historique</h2>
+    <h2>Historique <span id="match-count" style="color:var(--accent);"></span></h2>
     <div id="table-wrap"></div>
   </div>
 </div>
@@ -252,26 +243,8 @@ async function saveEntries(){
 }
 
 function render(){
-  renderStats();
   renderPatternTable();
   renderTable();
-}
-
-function renderStats(){
-  const total = entries.length;
-  document.getElementById('s-total').textContent = total;
-  if(total===0){
-    document.getElementById('s-exact').textContent='0%';
-    document.getElementById('s-issue').textContent='0%';
-    document.getElementById('s-miss').textContent='0%';
-    return;
-  }
-  const exact = entries.filter(e=>e.result==='exact').length;
-  const partial = entries.filter(e=>e.result==='partial').length;
-  const miss = entries.filter(e=>e.result==='miss').length;
-  document.getElementById('s-exact').textContent = Math.round(exact/total*100)+'%';
-  document.getElementById('s-issue').textContent = Math.round((exact+partial)/total*100)+'%';
-  document.getElementById('s-miss').textContent = Math.round(miss/total*100)+'%';
 }
 
 function confidenceLevel(n){
@@ -368,12 +341,12 @@ function renderPatternTable(){
 }
 
 function renderTable(){
+  document.getElementById('match-count').textContent = entries.length ? `(${entries.length})` : '';
   const el = document.getElementById('table-wrap');
   if(entries.length===0){
     el.innerHTML = '<p class="empty">Aucun match enregistré pour le moment.</p>';
     return;
   }
-  const tagLabel = {exact:'Exact', partial:'Résultat OK', miss:'Raté'};
   const rowsHtml = entries.slice().reverse().map((e)=>{
     const idx = entries.indexOf(e);
     return `
@@ -381,13 +354,12 @@ function renderTable(){
       <td>${escapeHtml(e.pays)}</td>
       <td class="score">${e.predH}–${e.predA}</td>
       <td class="score">${e.realH}–${e.realA}</td>
-      <td><span class="tag ${e.result}">${tagLabel[e.result]}</span></td>
       <td><button class="del-btn" data-idx="${idx}">✕</button></td>
     </tr>`;
   }).join('');
   el.innerHTML = `
     <table>
-      <thead><tr><th>Pays</th><th>Pronostic</th><th>Score réel</th><th>Résultat</th><th></th></tr></thead>
+      <thead><tr><th>Pays</th><th>Pronostic</th><th>Score réel</th><th></th></tr></thead>
       <tbody>${rowsHtml}</tbody>
     </table>
   `;
