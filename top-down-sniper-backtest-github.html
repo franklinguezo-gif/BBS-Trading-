@@ -464,7 +464,7 @@
     <table id="histTable">
       <thead>
         <tr>
-          <th>Date</th><th>Actif</th><th>Sess.</th><th>Sens</th><th>H1</th><th>M15</th><th>Checklist</th><th>Résultat</th><th>Raison</th><th></th>
+          <th>Date</th><th>Actif</th><th>Sess.</th><th>Sens</th><th>H1</th><th>M15</th><th>Checklist</th><th>Résultat</th><th>Raison</th><th>Notes</th><th></th>
         </tr>
       </thead>
       <tbody id="histBody"></tbody>
@@ -683,6 +683,7 @@ function render(){
         <td>${checklist}</td>
         <td><span class="tag ${t.resultat}">${t.resultat==='win'?'Gain':t.resultat==='loss'?'Perte':'BE'}</span></td>
         <td>${t.raison}</td>
+        <td style="white-space:normal;max-width:220px;color:var(--text-dim)" title="${(t.notes||'').replace(/"/g,'&quot;')}">${t.notes ? (t.notes.length > 40 ? t.notes.slice(0,40)+'…' : t.notes) : '—'}</td>
         <td><button class="del-btn" data-id="${t.id}" title="Supprimer">✕</button></td>
       </tr>`;
   }).join('');
