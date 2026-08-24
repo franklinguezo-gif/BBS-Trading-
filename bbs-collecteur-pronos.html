@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BBS — Collecteur Pronos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#08090b;
+    --panel:#111318;
+    --panel2:#161920;
+    --panel3:#0d0f13;
+    --line:#22262e;
+    --line-soft:#1a1d24;
+    --text:#e4e7eb;
+    --dim:#7a8290;
+    --dim-soft:#565d68;
+    --accent:#d4a017;
+    --accent-soft:rgba(212,160,23,0.12);
+    --hit:#3ddc84;
+    --hit-soft:rgba(61,220,132,0.10);
+    --miss:#ef5b5b;
+    --miss-soft:rgba(239,91,91,0.10);
+    --mono: "JetBrains Mono","SF Mono",Consolas,monospace;
+    --display: "Space Grotesk","Inter",sans-serif;
+    --sans: "Inter","Segoe UI",sans-serif;
+    --radius:7px;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(212,160,23,0.05), transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    padding:24px;
+    font-size:14px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1150px;margin:0 auto;}
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:1px solid var(--line);
+    padding-bottom:18px;
+    margin-bottom:24px;
+    flex-wrap:wrap;
+    gap:10px;
+    position:relative;
+  }
+  header::before{
+    content:'';
+    position:absolute;
+    top:-24px; left:0; right:0;
+    height:2px;
+    background:linear-gradient(90deg, var(--accent), transparent 60%);
+  }
+  h1{
+    font-family:var(--display);
+    font-size:19px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+    margin:0;
+    color:var(--text);
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+  }
+  h1 .brand{color:var(--accent);}
+  h1 span.tag{
+    font-family:var(--mono);
+    font-size:11px;
+    font-weight:500;
+    color:var(--dim);
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    background:var(--panel2);
+    border:1px solid var(--line);
+    padding:3px 8px;
+    border-radius:4px;
+  }
+  .sub{font-family:var(--mono);font-size:11px;color:var(--dim-soft);letter-spacing:0.02em;}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px;
+    margin-bottom:16px;
+    box-shadow:var(--shadow);
+  }
+  .panel h2{
+    font-family:var(--mono);
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.1em;
+    color:var(--dim-soft);
+    margin:0 0 14px 0;
+    padding-bottom:8px;
+    border-bottom:1px solid var(--line-soft);
+  }
+
+  label{
+    display:block;
+    font-size:10.5px;
+    color:var(--dim-soft);
+    margin-bottom:5px;
+    font-family:var(--mono);
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+  }
+  input{
+    background:#0a0b0e;
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:8px 9px;
+    border-radius:5px;
+    font-family:var(--mono);
+    font-size:13px;
+    transition:border-color .15s ease;
+  }
+  input:focus{outline:none;border-color:var(--accent);}
+  input.w-full{width:100%;}
+  input.w-sm{width:54px;text-align:center;}
+  input.w-md{width:104px;}
+
+  .inline{display:flex;align-items:center;gap:6px;}
+  .inline span{color:var(--dim-soft);font-family:var(--mono);font-size:12px;}
+
+  button{
+    background:var(--accent);
+    color:#08090b;
+    border:none;
+    padding:9px 16px;
+    border-radius:5px;
+    font-family:var(--mono);
+    font-weight:700;
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    cursor:pointer;
+    transition:filter .15s ease, transform .1s ease;
+  }
+  button:hover{filter:brightness(1.12);}
+  button:active{transform:translateY(1px);}
+  button.ghost{
+    background:transparent;
+    color:var(--dim);
+    border:1px solid var(--line);
+    font-weight:500;
+  }
+  button.ghost:hover{color:var(--text);border-color:var(--dim-soft);filter:none;}
+  button.danger{color:var(--miss);}
+  button.small{padding:5px 10px;font-size:10.5px;}
+
+  .tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .tab-btn{
+    background:var(--panel);
+    color:var(--dim);
+    border:1px solid var(--line);
+    padding:11px 20px;
+    border-radius:var(--radius);
+    font-family:var(--mono);
+    font-weight:600;
+    font-size:13px;
+    letter-spacing:0.02em;
+    cursor:pointer;
+    transition:all .15s ease;
+    box-shadow:var(--shadow);
+  }
+  .tab-btn:hover{color:var(--text);border-color:var(--dim-soft);}
+  .tab-btn.active{background:var(--accent);color:#08090b;border-color:var(--accent);}
+  .tab-btn .tab-meta{display:block;font-size:10px;font-weight:400;opacity:0.75;margin-top:3px;}
+
+  .new-interval-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
+
+  .interval-block{
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    margin-bottom:14px;
+    overflow:hidden;
+    box-shadow:var(--shadow);
+  }
+  .interval-head{
+    background:var(--panel2);
+    padding:12px 16px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  .interval-head:hover{background:#191d25;}
+  .interval-head .label{
+    font-family:var(--display);
+    font-weight:600;
+    color:var(--text);
+    font-size:15px;
+    letter-spacing:-0.01em;
+  }
+  .interval-head .meta{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--dim);
+    display:flex;
+    gap:14px;
+    align-items:center;
+  }
+  .interval-body{padding:16px;display:none;}
+  .interval-body.open{display:block;}
+
+  .add-entry-row{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    background:var(--panel3);
+    border:1px dashed var(--line);
+    border-radius:var(--radius);
+    padding:12px;
+    margin-bottom:14px;
+  }
+
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th{
+    text-align:left;
+    font-family:var(--mono);
+    font-size:9.5px;
+    text-transform:uppercase;
+    color:var(--dim-soft);
+    border-bottom:1px solid var(--line);
+    padding:8px 7px;
+    letter-spacing:0.06em;
+    white-space:nowrap;
+  }
+  td{
+    padding:8px 7px;
+    border-bottom:1px solid var(--line-soft);
+    font-family:var(--mono);
+    white-space:nowrap;
+  }
+  tr:hover td{background:#14161c;}
+  .tag{display:inline-block;padding:3px 8px;border-radius:4px;font-size:10.5px;font-weight:500;letter-spacing:0.01em;}
+  .tag.hit{background:var(--hit-soft);color:var(--hit);}
+  .tag.miss{background:var(--miss-soft);color:var(--miss);}
+  .tag.top{background:var(--accent-soft);color:var(--accent);font-weight:700;}
+  .empty{color:var(--dim-soft);text-align:center;padding:22px 0;font-family:var(--mono);font-size:12px;}
+
+  .stat-mini .value{font-family:var(--mono);font-size:15px;}
+
+  .global-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+  .stat{border:1px solid var(--line);border-radius:6px;padding:12px 14px;background:var(--panel3);}
+  .stat .label{font-family:var(--mono);font-size:9.5px;color:var(--dim-soft);text-transform:uppercase;letter-spacing:0.08em;}
+  .stat .value{font-family:var(--display);font-weight:600;font-size:23px;margin-top:5px;}
+  .bar{height:4px;background:var(--line);border-radius:2px;margin-top:7px;overflow:hidden;}
+  .bar-fill{height:100%;background:var(--accent);border-radius:2px;}
+
+  .footnote{font-family:var(--mono);font-size:10px;color:var(--dim-soft);margin-top:8px;}
+  ::-webkit-scrollbar{height:8px;width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1><span class="brand">BBS</span> Collecteur Pronos <span class="tag">v2</span></h1>
+    <div class="sub">rangée → intervalle → cote -3.5 + score réel → constat par tranche de cote</div>
+  </header>
+
+  <div class="panel">
+    <h2>Fiabilité globale</h2>
+    <div class="global-stats" id="global-stats">
+      <div class="empty" style="grid-column:1/-1;">Aucune donnée pour le moment</div>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div id="rangee-container"></div>
+
+  <div class="footnote">Données stockées localement dans le navigateur (localStorage) — propres à cet appareil et ce navigateur. Tranches de cote calculées par pas de 0,10.</div>
+</div>
+
+<script>
+const STORAGE_KEY = 'bbs-collecteur-rangees-v2';
+const FIXED_RANGEES = [
+  { id: 'g-41-14', label: '4-1 / 1-4' },
+  { id: 'g-31-13', label: '3-1 / 1-3' }
+];
+let rangees = [];
+let activeRangeeId = FIXED_RANGEES[0].id;
+let openIntervalId = null;
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+const MARKET_DEFS = [
+  { key:'ft_o15', label:'FT +1.5', scope:'ft', test:(v)=> v>=2 },
+  { key:'ft_u15', label:'FT -1.5', scope:'ft', test:(v)=> v<=1 },
+  { key:'ft_o25', label:'FT +2.5', scope:'ft', test:(v)=> v>=3 },
+  { key:'ft_u25', label:'FT -2.5', scope:'ft', test:(v)=> v<=2 },
+  { key:'ft_o35', label:'FT +3.5', scope:'ft', test:(v)=> v>=4 },
+  { key:'ft_u35', label:'FT -3.5', scope:'ft', test:(v)=> v<=3 },
+  { key:'ht_o15', label:'HT +1.5', scope:'ht', test:(v)=> v>=2 },
+  { key:'ht_u15', label:'HT -1.5', scope:'ht', test:(v)=> v<=1 },
+];
+
+function confidenceTag(n){
+  if (n < 5) return { label: 'insuffisant', cls: 'miss' };
+  if (n < 10) return { label: 'à confirmer', cls: '' };
+  return { label: 'fiable', cls: 'hit' };
+}
+
+function hasFT(e){ return e.ftHome !== '' && e.ftAway !== '' && e.ftHome != null && e.ftAway != null; }
+function hasHT(e){ return e.htHome !== '' && e.htAway !== '' && e.htHome != null && e.htAway != null; }
+
+function analyzeMarkets(entries){
+  const counts = {};
+  MARKET_DEFS.forEach(m => counts[m.key] = { hit:0, total:0, label:m.label });
+  counts['ft_12'] = { hit:0, total:0, label:'FT 12 (pas de nul)' };
+  const oneXtwo = { '1':0, 'X':0, '2':0, total:0 };
+
+  entries.forEach(e => {
+    const ftTotal = hasFT(e) ? parseInt(e.ftHome) + parseInt(e.ftAway) : null;
+    const htTotal = hasHT(e) ? parseInt(e.htHome) + parseInt(e.htAway) : null;
+
+    MARKET_DEFS.forEach(m => {
+      const val = m.scope === 'ft' ? ftTotal : htTotal;
+      if (val === null) return;
+      counts[m.key].total++;
+      if (m.test(val)) counts[m.key].hit++;
+    });
+
+    if (hasFT(e)){
+      const h = parseInt(e.ftHome), a = parseInt(e.ftAway);
+      const w = h > a ? '1' : (h < a ? '2' : 'X');
+      oneXtwo[w]++;
+      oneXtwo.total++;
+
+      counts['ft_12'].total++;
+      if (w !== 'X') counts['ft_12'].hit++;
+    }
+  });
+
+  const ranked = [...MARKET_DEFS, { key:'ft_12', label:'FT 12 (pas de nul)' }]
+    .map(m => ({ label: m.label, ...counts[m.key], pct: counts[m.key].total ? Math.round((counts[m.key].hit/counts[m.key].total)*100) : 0 }))
+    .filter(m => m.total > 0)
+    .sort((a,b) => b.pct - a.pct);
+
+  return { ranked, oneXtwo };
+}
+
+// Regroupe les entrées par tranche de cote (pas de 0.10) et calcule, pour chaque tranche,
+// le marché le plus confirmé -> c'est le "constat" demandé.
+function analyzeByCoteBucket(entries){
+  const withCote = entries.filter(e => e.cote !== '' && e.cote != null && hasFT(e));
+  if (withCote.length === 0) return [];
+
+  const buckets = {};
+  withCote.forEach(e => {
+    const cote = parseFloat(e.cote);
+    const floor = Math.floor(cote * 10) / 10;
+    const key = floor.toFixed(2);
+    if (!buckets[key]) buckets[key] = { key, low: floor, high: floor + 0.09, entries: [] };
+    buckets[key].entries.push(e);
+  });
+
+  return Object.values(buckets)
+    .sort((a,b) => a.low - b.low)
+    .map(b => {
+      const analysis = analyzeMarkets(b.entries);
+      const top = analysis.ranked[0];
+      return {
+        range: `${b.low.toFixed(2)}–${b.high.toFixed(2)}`,
+        n: b.entries.length,
+        top: top || null
+      };
+    });
+}
+
+async function load(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    rangees = raw ? JSON.parse(raw) : [];
+  } catch(err){
+    rangees = [];
+  }
+  FIXED_RANGEES.forEach(fr => {
+    if (!rangees.find(r => r.id === fr.id)){
+      rangees.push({ id: fr.id, label: fr.label, intervals: [] });
+    }
+  });
+  renderAll();
+}
+
+async function save(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rangees));
+  } catch(err){
+    console.error('Storage error', err);
+  }
+}
+
+function allEntriesOfRangee(r){
+  let all = [];
+  r.intervals.forEach(iv => all = all.concat(iv.entries));
+  return all;
+}
+
+function renderTabs(){
+  const el = document.getElementById('tabs');
+  el.innerHTML = FIXED_RANGEES.map(fr => {
+    const r = rangees.find(x => x.id === fr.id);
+    const count = r ? allEntriesOfRangee(r).length : 0;
+    const isActive = fr.id === activeRangeeId;
+    return `
+      <button class="tab-btn ${isActive ? 'active' : ''}" onclick="switchTab('${fr.id}')">
+        ${fr.label}
+        <span class="tab-meta">${count} entrée(s)</span>
+      </button>
+    `;
+  }).join('');
+}
+
+function switchTab(id){
+  activeRangeeId = id;
+  openIntervalId = null;
+  renderAll();
+}
+
+function renderGlobalStats(){
+  const el = document.getElementById('global-stats');
+  let all = [];
+  rangees.forEach(r => { all = all.concat(allEntriesOfRangee(r)); });
+
+  const withFT = all.filter(hasFT);
+  if (withFT.length === 0){
+    el.innerHTML = '<div class="empty" style="grid-column:1/-1;">Aucune donnée pour le moment</div>';
+    return;
+  }
+
+  const withCote = withFT.filter(e => e.cote !== '' && e.cote != null);
+  const avgCote = withCote.length ? (withCote.reduce((s,e)=>s+parseFloat(e.cote),0)/withCote.length).toFixed(2) : '—';
+  const analysis = analyzeMarkets(withFT);
+  const top = analysis.ranked[0];
+
+  el.innerHTML = `
+    <div class="stat">
+      <div class="label">Entrées renseignées</div>
+      <div class="value">${withFT.length}</div>
+    </div>
+    <div class="stat">
+      <div class="label">Option la plus fiable</div>
+      <div class="value" style="font-size:16px;color:var(--accent);">${top ? top.label : '—'}</div>
+      ${top ? `<div class="bar"><div class="bar-fill" style="width:${top.pct}%;"></div></div><div class="footnote">${top.pct}% (${top.hit}/${top.total})</div>` : ''}
+    </div>
+    <div class="stat">
+      <div class="label">Cote -3.5 moyenne</div>
+      <div class="value">${avgCote}</div>
+    </div>
+  `;
+}
+
+function renderRangeeBody(){
+  const container = document.getElementById('rangee-container');
+  const r = rangees.find(x => x.id === activeRangeeId);
+  if (!r){ container.innerHTML = ''; return; }
+
+  const blocks = r.intervals.length === 0
+    ? '<div class="empty">Aucun intervalle créé dans cette rangée — ajoute-en un ci-dessous.</div>'
+    : r.intervals.map(iv => renderIntervalBlock(r.id, iv)).join('');
+
+  container.innerHTML = `
+    <div class="panel">
+      <h2>Nouvel intervalle dans « ${r.label} »</h2>
+      <div class="new-interval-row">
+        <div>
+          <label>Libellé de l'intervalle (ex: 1/4/5)</label>
+          <input type="text" class="w-md" id="new-interval-label" placeholder="1/4/5">
+        </div>
+        <button onclick="addInterval('${r.id}')">+ Créer l'intervalle</button>
+      </div>
+    </div>
+    ${blocks}
+  `;
+}
+
+function renderIntervalBlock(rangeeId, iv){
+  const isOpen = iv.id === openIntervalId;
+  const analysis = analyzeMarkets(iv.entries);
+  const top = analysis.ranked[0];
+  const buckets = analyzeByCoteBucket(iv.entries);
+
+  const marketRows = analysis.ranked.map((m, idx) => {
+    const conf = confidenceTag(m.total);
+    return `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;">
+      <div style="width:120px;font-size:11.5px;font-family:var(--mono);${idx===0?'color:var(--accent);font-weight:700;':'color:var(--dim);'}">${m.label}</div>
+      <div class="bar" style="flex:1;"><div class="bar-fill" style="width:${m.pct}%;${idx===0?'':'background:var(--dim-soft);'}"></div></div>
+      <div style="width:78px;text-align:right;font-size:11px;">${m.pct}% <span style="color:var(--dim-soft);">(${m.hit}/${m.total})</span></div>
+      ${idx===0 ? '<span class="tag top">top</span>' : '<span style="width:38px;"></span>'}
+      <span class="tag ${conf.cls}" style="width:74px;text-align:center;">${conf.label}</span>
+    </div>
+  `;}).join('');
+
+  const oxt = analysis.oneXtwo;
+  let oxtLine = '';
+  if (oxt.total > 0){
+    const p1 = Math.round((oxt['1']/oxt.total)*100);
+    const pX = Math.round((oxt['X']/oxt.total)*100);
+    const p2 = Math.round((oxt['2']/oxt.total)*100);
+    oxtLine = `<div class="footnote">Répartition 1X2 sur ${oxt.total} match(s) : 1 = ${p1}% · X = ${pX}% · 2 = ${p2}%</div>`;
+  }
+
+  const bucketTable = buckets.length === 0
+    ? '<div class="empty">Ajoute la cote -3.5 sur tes entrées pour voir le constat par tranche</div>'
+    : `
+      <table style="margin-top:8px;">
+        <thead>
+          <tr><th>Tranche de cote -3.5</th><th>N</th><th>Option confirmée</th><th>Fiabilité</th><th>Confiance</th></tr>
+        </thead>
+        <tbody>
+          ${buckets.map(b => {
+            const conf = confidenceTag(b.n);
+            return `
+            <tr>
+              <td>${b.range}</td>
+              <td>${b.n}</td>
+              <td>${b.top ? b.top.label : '—'}</td>
+              <td>${b.top ? `<span class="tag ${b.top.pct >= 60 ? 'hit' : 'miss'}">${b.top.pct}%</span>` : '—'}</td>
+              <td><span class="tag ${conf.cls}">${conf.label}</span></td>
+            </tr>
+          `;}).join('')}
+        </tbody>
+      </table>
+    `;
+
+  const entryRows = iv.entries.length === 0
+    ? '<tr><td colspan="6" class="empty">Aucune entrée dans cet intervalle</td></tr>'
+    : iv.entries.map(e => {
+        let resultCell = '<span class="tag" style="background:transparent;color:var(--dim);">en attente</span>';
+        if (hasFT(e)){
+          const total = parseInt(e.ftHome) + parseInt(e.ftAway);
+          resultCell = total <= 3
+            ? `<span class="tag hit">FT -3.5 ✓ (total ${total})</span>`
+            : `<span class="tag miss">FT +3.5 ✗ (total ${total})</span>`;
+        }
+        return `
+          <tr>
+            <td>${e.cote !== '' ? e.cote : '—'}</td>
+            <td>${e.htHome !== '' ? e.htHome : '–'}-${e.htAway !== '' ? e.htAway : '–'}</td>
+            <td>${e.ftHome !== '' ? e.ftHome : '–'}-${e.ftAway !== '' ? e.ftAway : '–'}</td>
+            <td>${resultCell}</td>
+            <td><button class="ghost danger small" onclick="deleteEntry('${rangeeId}','${iv.id}','${e.id}')">✕</button></td>
+          </tr>
+        `;
+      }).join('');
+
+  return `
+    <div class="interval-block">
+      <div class="interval-head" onclick="toggleInterval('${iv.id}')">
+        <div class="label">${iv.label}</div>
+        <div class="meta">
+          <div class="stat-mini"><span class="value">${iv.entries.length}</span> pts</div>
+          <button class="ghost danger small" onclick="event.stopPropagation(); deleteInterval('${rangeeId}','${iv.id}')">Supprimer</button>
+        </div>
+      </div>
+      <div class="interval-body ${isOpen ? 'open' : ''}">
+        <div class="panel" style="background:var(--panel3);margin-bottom:12px;">
+          <h2>Constat — fiabilité par marché</h2>
+          ${analysis.ranked.length === 0 ? '<div class="empty">Renseigne des scores HT/FT pour voir l’analyse</div>' : `${marketRows}${oxtLine}${top ? `<div class="footnote" style="color:var(--accent);margin-top:6px;">Option la plus fiable : <strong>${top.label}</strong> (${top.pct}%)</div>` : ''}`}
+          <h2 style="margin-top:14px;">Constat — par tranche de cote -3.5</h2>
+          ${bucketTable}
+        </div>
+        <div class="add-entry-row">
+          <div>
+            <label>Cote -3.5</label>
+            <input type="number" step="0.01" class="w-sm" id="e-cote-${iv.id}" placeholder="1,40">
+          </div>
+          <div>
+            <label>Score HT</label>
+            <div class="inline">
+              <input type="number" min="0" class="w-sm" id="e-ht-h-${iv.id}">
+              <span>—</span>
+              <input type="number" min="0" class="w-sm" id="e-ht-a-${iv.id}">
+            </div>
+          </div>
+          <div>
+            <label>Score FT</label>
+            <div class="inline">
+              <input type="number" min="0" class="w-sm" id="e-ft-h-${iv.id}">
+              <span>—</span>
+              <input type="number" min="0" class="w-sm" id="e-ft-a-${iv.id}">
+            </div>
+          </div>
+          <button onclick="addEntry('${rangeeId}','${iv.id}')">+ Enregistrer</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>Cote -3.5</th><th>Score HT</th><th>Score FT</th><th>Résultat</th><th></th></tr>
+            </thead>
+            <tbody>${entryRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderAll(){
+  renderTabs();
+  renderGlobalStats();
+  renderRangeeBody();
+}
+
+async function addInterval(rangeeId){
+  const input = document.getElementById('new-interval-label');
+  const label = input.value.trim();
+  if (!label) return;
+  const r = rangees.find(x => x.id === rangeeId);
+  if (!r) return;
+  const iv = { id: uid(), label, entries: [] };
+  r.intervals.push(iv);
+  openIntervalId = iv.id;
+  await save();
+  renderAll();
+}
+
+async function deleteInterval(rangeeId, ivId){
+  if (!confirm('Supprimer cet intervalle et toutes ses entrées ?')) return;
+  const r = rangees.find(x => x.id === rangeeId);
+  if (!r) return;
+  r.intervals = r.intervals.filter(iv => iv.id !== ivId);
+  await save();
+  renderAll();
+}
+
+function toggleInterval(id){
+  openIntervalId = openIntervalId === id ? null : id;
+  renderRangeeBody();
+}
+
+async function addEntry(rangeeId, ivId){
+  const cote = document.getElementById(`e-cote-${ivId}`).value;
+  const htHome = document.getElementById(`e-ht-h-${ivId}`).value;
+  const htAway = document.getElementById(`e-ht-a-${ivId}`).value;
+  const ftHome = document.getElementById(`e-ft-h-${ivId}`).value;
+  const ftAway = document.getElementById(`e-ft-a-${ivId}`).value;
+
+  const r = rangees.find(x => x.id === rangeeId);
+  if (!r) return;
+  const iv = r.intervals.find(x => x.id === ivId);
+  if (!iv) return;
+
+  iv.entries.push({ id: uid(), cote, htHome, htAway, ftHome, ftAway });
+  openIntervalId = ivId;
+  await save();
+  renderAll();
+}
+
+async function deleteEntry(rangeeId, ivId, entryId){
+  const r = rangees.find(x => x.id === rangeeId);
+  if (!r) return;
+  const iv = r.intervals.find(x => x.id === ivId);
+  if (!iv) return;
+  iv.entries = iv.entries.filter(e => e.id !== entryId);
+  await save();
+  renderAll();
+}
+
+load();
+</script>
+</body>
+</html>
