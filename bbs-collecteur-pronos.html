@@ -24,6 +24,8 @@
     --hit-soft:rgba(61,220,132,0.10);
     --miss:#ef5b5b;
     --miss-soft:rgba(239,91,91,0.10);
+    --select:#5b8dee;
+    --select-soft:rgba(91,141,238,0.14);
     --mono: "JetBrains Mono","SF Mono",Consolas,monospace;
     --display: "Space Grotesk","Inter",sans-serif;
     --sans: "Inter","Segoe UI",sans-serif;
@@ -117,7 +119,7 @@
     letter-spacing:0.04em;
   }
   input{
-    background:#0a0b0e;
+    background:var(--panel3);
     border:1px solid var(--line);
     color:var(--text);
     padding:8px 9px;
@@ -130,6 +132,19 @@
   input.w-full{width:100%;}
   input.w-sm{width:54px;text-align:center;}
   input.w-md{width:104px;}
+
+  select{
+    background:var(--panel3);
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:8px 9px;
+    border-radius:5px;
+    font-family:var(--mono);
+    font-size:13px;
+    transition:border-color .15s ease;
+  }
+  select:focus{outline:none;border-color:var(--accent);}
+  select.w-md{width:104px;}
 
   .inline{display:flex;align-items:center;gap:6px;}
   .inline span{color:var(--dim-soft);font-family:var(--mono);font-size:12px;}
@@ -247,6 +262,28 @@
     white-space:nowrap;
   }
   tr:hover td{background:#14161c;}
+  tr.row-selected td{background:var(--select-soft);box-shadow:inset 3px 0 0 var(--select);}
+  .selection-bar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--select-soft);
+    border:1px solid var(--select);
+    border-radius:6px;
+    padding:9px 12px;
+    margin-bottom:10px;
+    font-family:var(--mono);
+    font-size:12px;
+  }
+  .selection-bar .count{color:var(--select);font-weight:700;}
+  .featured-panel{
+    background:linear-gradient(135deg, rgba(212,160,23,0.06), transparent);
+    border:1px solid var(--accent-soft);
+    border-radius:var(--radius);
+    padding:14px;
+    margin-bottom:14px;
+  }
+  .featured-panel h2{color:var(--accent);border-bottom-color:rgba(212,160,23,0.2);}
   .tag{display:inline-block;padding:3px 8px;border-radius:4px;font-size:10.5px;font-weight:500;letter-spacing:0.01em;}
   .tag.hit{background:var(--hit-soft);color:var(--hit);}
   .tag.miss{background:var(--miss-soft);color:var(--miss);}
@@ -271,15 +308,62 @@
 <div class="wrap">
 
   <header>
-    <h1><span class="brand">BBS</span> Collecteur Pronos <span class="tag">v2</span></h1>
-    <div class="sub">rangée → intervalle → cote -3.5 + score réel → constat par tranche de cote</div>
+    <div>
+      <h1><span class="brand">BBS</span> Collecteur Pronos <span class="tag">v2</span></h1>
+      <div class="sub">rangée → intervalle → cote -3.5 + score réel → constat par tranche de cote</div>
+    </div>
   </header>
+
+  <div class="panel featured-panel">
+    <h2>🎯 Pronostic du jour — matchs pas encore joués</h2>
+    <div class="new-interval-row">
+      <div>
+        <label>Match (libre)</label>
+        <input type="text" class="w-md" id="dp-label" placeholder="Cardiff - Bristol">
+      </div>
+      <div>
+        <label>Rangée</label>
+        <select id="dp-rangee" class="w-md" onchange="populateDailyIntervalOptions()"></select>
+      </div>
+      <div>
+        <label>Intervalle</label>
+        <select id="dp-interval" class="w-md"></select>
+      </div>
+      <div>
+        <label>Cote -3.5 du jour</label>
+        <input type="number" step="0.01" class="w-sm" id="dp-cote" placeholder="1,40">
+      </div>
+      <button onclick="addDailyPick()">+ Ajouter au jour</button>
+      <button class="ghost" onclick="clearDailyPicks()">Vider le jour</button>
+    </div>
+    <div id="daily-picks-results"></div>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px;">
+    <button class="ghost small" onclick="exportJSON()">⭳ Exporter JSON</button>
+    <button class="ghost small" onclick="exportCSV()">⭳ Exporter CSV</button>
+    <input type="file" id="import-json-input" accept="application/json" style="display:none" onchange="importJSONFile(event)">
+    <button class="ghost small" onclick="document.getElementById('import-json-input').click()">⭱ Importer JSON</button>
+  </div>
 
   <div class="panel">
     <h2>Fiabilité globale</h2>
     <div class="global-stats" id="global-stats">
       <div class="empty" style="grid-column:1/-1;">Aucune donnée pour le moment</div>
     </div>
+  </div>
+
+  <div class="panel">
+    <h2>Recherche générale — par tranche de cote -3.5</h2>
+    <div class="new-interval-row">
+      <div>
+        <label>Cote (ex: 1.40 → cherche toute la tranche 1.40–1.49)</label>
+        <input type="number" step="0.01" class="w-md" id="search-cote" placeholder="1.40">
+      </div>
+      <button onclick="runSearch()">Rechercher</button>
+      <button class="ghost" onclick="clearSearch()">Effacer</button>
+    </div>
+    <div id="search-results"></div>
   </div>
 
   <div class="tabs" id="tabs"></div>
@@ -295,11 +379,46 @@ const FIXED_RANGEES = [
   { id: 'g-41-14', label: '4-1 / 1-4' },
   { id: 'g-31-13', label: '3-1 / 1-3' }
 ];
+const FIXED_INTERVALS = {
+  'g-41-14': ['1/3/4', '1/4/5', '1/4/4', '1/4/6', '1/3/3'],
+  'g-31-13': ['1/3/3', '2/3/2', '1/3/4', '2/3/3']
+};
 let rangees = [];
 let activeRangeeId = FIXED_RANGEES[0].id;
 let openIntervalId = null;
+let editingEntryId = null;
+let selectedEntryIds = new Set();
+let longPressTimer = null;
+const DAILY_STORAGE = 'bbs-daily-picks';
+let dailyPicks = [];
+
+function startLongPress(entryId){
+  clearTimeout(longPressTimer);
+  longPressTimer = setTimeout(() => { toggleSelectEntry(entryId); }, 450);
+}
+function cancelLongPress(){
+  clearTimeout(longPressTimer);
+}
+function toggleSelectEntry(entryId){
+  if (selectedEntryIds.has(entryId)) selectedEntryIds.delete(entryId);
+  else selectedEntryIds.add(entryId);
+  renderRangeeBody();
+}
+async function deleteSelected(rangeeId, ivId){
+  if (selectedEntryIds.size === 0) return;
+  if (!confirm(`Supprimer ${selectedEntryIds.size} entrée(s) sélectionnée(s) ?`)) return;
+  const r = rangees.find(x => x.id === rangeeId);
+  if (!r) return;
+  const iv = r.intervals.find(x => x.id === ivId);
+  if (!iv) return;
+  iv.entries = iv.entries.filter(e => !selectedEntryIds.has(e.id));
+  selectedEntryIds.clear();
+  await save();
+  renderAll();
+}
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
 
 const MARKET_DEFS = [
   { key:'ft_o15', label:'FT +1.5', scope:'ft', test:(v)=> v>=2 },
@@ -325,6 +444,8 @@ function analyzeMarkets(entries){
   const counts = {};
   MARKET_DEFS.forEach(m => counts[m.key] = { hit:0, total:0, label:m.label });
   counts['ft_12'] = { hit:0, total:0, label:'FT 12 (pas de nul)' };
+  counts['btts_yes'] = { hit:0, total:0, label:'BTTS Oui' };
+  counts['btts_no'] = { hit:0, total:0, label:'BTTS Non' };
   const oneXtwo = { '1':0, 'X':0, '2':0, total:0 };
 
   entries.forEach(e => {
@@ -346,10 +467,16 @@ function analyzeMarkets(entries){
 
       counts['ft_12'].total++;
       if (w !== 'X') counts['ft_12'].hit++;
+
+      const btts = h > 0 && a > 0;
+      counts['btts_yes'].total++;
+      if (btts) counts['btts_yes'].hit++;
+      counts['btts_no'].total++;
+      if (!btts) counts['btts_no'].hit++;
     }
   });
 
-  const ranked = [...MARKET_DEFS, { key:'ft_12', label:'FT 12 (pas de nul)' }]
+  const ranked = [...MARKET_DEFS, { key:'ft_12', label:'FT 12 (pas de nul)' }, { key:'btts_yes', label:'BTTS Oui' }, { key:'btts_no', label:'BTTS Non' }]
     .map(m => ({ label: m.label, ...counts[m.key], pct: counts[m.key].total ? Math.round((counts[m.key].hit/counts[m.key].total)*100) : 0 }))
     .filter(m => m.total > 0)
     .sort((a,b) => b.pct - a.pct);
@@ -385,6 +512,359 @@ function analyzeByCoteBucket(entries){
     });
 }
 
+function allEntriesFlat(){
+  let flat = [];
+  rangees.forEach(r => {
+    r.intervals.forEach(iv => {
+      iv.entries.forEach(e => {
+        flat.push({ rangeeLabel: r.label, intervalLabel: iv.label, rangeeId: r.id, ivId: iv.id, ...e });
+      });
+    });
+  });
+  return flat;
+}
+
+function runSearch(){
+  const val = document.getElementById('search-cote').value;
+  const el = document.getElementById('search-results');
+  if (val === ''){ el.innerHTML = ''; return; }
+
+  const floor = Math.floor(parseFloat(val) * 10) / 10;
+  const high = floor + 0.09;
+  const matches = allEntriesFlat().filter(e => {
+    if (e.cote === '' || e.cote == null) return false;
+    const c = parseFloat(e.cote);
+    return c >= floor - 0.0001 && c <= high + 0.0001;
+  });
+
+  if (matches.length === 0){
+    el.innerHTML = `<div class="empty">Aucune entrée entre ${floor.toFixed(2)} et ${high.toFixed(2)}</div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="footnote" style="margin-bottom:8px;">Tranche ${floor.toFixed(2)}–${high.toFixed(2)} — ${matches.length} résultat(s)</div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Rangée</th><th>Intervalle</th><th>Cote</th><th>HT</th><th>FT</th><th>Résultat</th></tr></thead>
+        <tbody>
+          ${matches.map(e => {
+            let resultCell = '<span class="tag" style="background:transparent;color:var(--dim);">en attente</span>';
+            if (hasFT(e)){
+              const total = parseInt(e.ftHome) + parseInt(e.ftAway);
+              resultCell = total <= 3
+                ? `<span class="tag hit">FT -3.5 ✓ (total ${total})</span>`
+                : `<span class="tag miss">FT +3.5 ✗ (total ${total})</span>`;
+            }
+            return `
+              <tr>
+                <td>${e.rangeeLabel}</td>
+                <td>${e.intervalLabel}</td>
+                <td>${e.cote}</td>
+                <td>${e.htHome !== '' ? e.htHome : '–'}-${e.htAway !== '' ? e.htAway : '–'}</td>
+                <td>${e.ftHome !== '' ? e.ftHome : '–'}-${e.ftAway !== '' ? e.ftAway : '–'}</td>
+                <td>${resultCell}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function clearSearch(){
+  document.getElementById('search-cote').value = '';
+  document.getElementById('search-results').innerHTML = '';
+}
+
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(rangees, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bbs-collecteur-pronos-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Fusionne un export JSON précédent avec les données déjà présentes.
+// Ne remplace jamais rien : ajoute uniquement ce qui manque (détection par id d'entrée).
+async function importJSONFile(event){
+  const file = event.target.files[0];
+  if (!file) return;
+
+  let imported;
+  try{
+    const text = await file.text();
+    imported = JSON.parse(text);
+  } catch(err){
+    alert('Fichier JSON invalide ou illisible.');
+    event.target.value = '';
+    return;
+  }
+
+  if (!Array.isArray(imported)){
+    alert('Ce fichier ne correspond pas au format attendu (export du Collecteur BBS).');
+    event.target.value = '';
+    return;
+  }
+
+  let added = 0;
+  imported.forEach(importedRangee => {
+    let r = rangees.find(x => x.id === importedRangee.id) || rangees.find(x => x.label === importedRangee.label);
+    if (!r){
+      r = { id: importedRangee.id || uid(), label: importedRangee.label, intervals: [] };
+      rangees.push(r);
+    }
+    (importedRangee.intervals || []).forEach(importedIv => {
+      let iv = r.intervals.find(x => x.id === importedIv.id) || r.intervals.find(x => x.label === importedIv.label);
+      if (!iv){
+        iv = { id: importedIv.id || uid(), label: importedIv.label, entries: [] };
+        r.intervals.push(iv);
+      }
+      (importedIv.entries || []).forEach(importedEntry => {
+        const exists = iv.entries.find(e => e.id === importedEntry.id);
+        if (!exists){
+          iv.entries.push(importedEntry);
+          added++;
+        }
+      });
+    });
+  });
+
+  await save();
+  renderAll();
+  event.target.value = '';
+  alert(added > 0
+    ? `Import terminé : ${added} nouvelle(s) entrée(s) ajoutée(s). Tes données existantes n'ont pas été touchées.`
+    : 'Import terminé : aucune nouvelle entrée (tout était déjà présent).');
+}
+
+function exportCSV(){
+  const flat = allEntriesFlat();
+  if (flat.length === 0) return;
+  const header = ['rangee','intervalle','cote','ht_dom','ht_ext','ft_dom','ft_ext'];
+  const rows = flat.map(e => [e.rangeeLabel, e.intervalLabel, e.cote, e.htHome, e.htAway, e.ftHome, e.ftAway].join(','));
+  const csv = [header.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bbs-collecteur-pronos-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function loadDailyPicks(){
+  try{
+    const raw = localStorage.getItem(DAILY_STORAGE);
+    dailyPicks = raw ? JSON.parse(raw) : [];
+  } catch(err){
+    dailyPicks = [];
+  }
+}
+
+function saveDailyPicks(){
+  try{
+    localStorage.setItem(DAILY_STORAGE, JSON.stringify(dailyPicks));
+  } catch(err){
+    console.error('Storage error', err);
+  }
+}
+
+function populateDailyRangeeOptions(){
+  const sel = document.getElementById('dp-rangee');
+  sel.innerHTML = FIXED_RANGEES.map(fr => `<option value="${fr.id}">${fr.label}</option>`).join('');
+  populateDailyIntervalOptions();
+}
+
+function populateDailyIntervalOptions(){
+  const rangeeId = document.getElementById('dp-rangee').value;
+  const r = rangees.find(x => x.id === rangeeId);
+  const sel = document.getElementById('dp-interval');
+  if (!r || r.intervals.length === 0){
+    sel.innerHTML = `<option value="">Aucun intervalle créé</option>`;
+    return;
+  }
+  sel.innerHTML = r.intervals.map(iv => `<option value="${iv.id}">${iv.label}</option>`).join('');
+}
+
+// Calcule la recommandation pour une cote donnée, à partir de l'historique déjà joué
+// de l'intervalle correspondant (même logique de tranche que le constat par cote).
+function computeDailyRecommendation(rangeeId, intervalId, cote){
+  const r = rangees.find(x => x.id === rangeeId);
+  if (!r) return null;
+  const iv = r.intervals.find(x => x.id === intervalId);
+  if (!iv) return null;
+
+  const floor = Math.floor(parseFloat(cote) * 10) / 10;
+  const high = floor + 0.09;
+  const bucketEntries = iv.entries.filter(e => {
+    if (!hasFT(e) || e.cote === '' || e.cote == null) return false;
+    const c = parseFloat(e.cote);
+    return c >= floor - 0.0001 && c <= high + 0.0001;
+  });
+
+  const analysis = analyzeMarkets(bucketEntries);
+  const top = analysis.ranked[0] || null;
+  return {
+    rangeeLabel: r.label,
+    intervalLabel: iv.label,
+    range: `${floor.toFixed(2)}–${high.toFixed(2)}`,
+    top,
+    n: bucketEntries.length
+  };
+}
+
+async function addDailyPick(){
+  const label = document.getElementById('dp-label').value.trim() || 'Match sans nom';
+  const rangeeId = document.getElementById('dp-rangee').value;
+  const intervalId = document.getElementById('dp-interval').value;
+  const cote = document.getElementById('dp-cote').value;
+
+  if (!rangeeId || !intervalId || cote === ''){
+    alert('Sélectionne une rangée, un intervalle et une cote.');
+    return;
+  }
+
+  dailyPicks.push({ id: uid(), label, rangeeId, intervalId, cote });
+  saveDailyPicks();
+  document.getElementById('dp-label').value = '';
+  document.getElementById('dp-cote').value = '';
+  renderDailyPicks();
+}
+
+async function finalizeDailyPick(pickId){
+  const pick = dailyPicks.find(p => p.id === pickId);
+  if (!pick) return;
+
+  const htHome = document.getElementById(`dp-ht-h-${pickId}`).value;
+  const htAway = document.getElementById(`dp-ht-a-${pickId}`).value;
+  const ftHome = document.getElementById(`dp-ft-h-${pickId}`).value;
+  const ftAway = document.getElementById(`dp-ft-a-${pickId}`).value;
+
+  if (ftHome === '' || ftAway === ''){
+    alert('Renseigne au moins le score final (FT) pour enregistrer ce match.');
+    return;
+  }
+
+  const r = rangees.find(x => x.id === pick.rangeeId);
+  if (!r) return;
+  const iv = r.intervals.find(x => x.id === pick.intervalId);
+  if (!iv) return;
+
+  iv.entries.push({ id: uid(), cote: pick.cote, htHome, htAway, ftHome, ftAway, date: todayStr() });
+  await save();
+
+  dailyPicks = dailyPicks.filter(p => p.id !== pickId);
+  saveDailyPicks();
+
+  renderAll();
+}
+
+async function deleteDailyPick(id){
+  dailyPicks = dailyPicks.filter(p => p.id !== id);
+  saveDailyPicks();
+  renderDailyPicks();
+}
+
+function exportDayJournal(dateStr){
+  const flat = allEntriesFlat().filter(e => e.date === dateStr);
+  if (flat.length === 0) return false;
+
+  const header = ['rangee','intervalle','cote','ht_dom','ht_ext','ft_dom','ft_ext','resultat_ft_-3.5'];
+  const rows = flat.map(e => {
+    const total = (e.ftHome !== '' && e.ftAway !== '') ? parseInt(e.ftHome) + parseInt(e.ftAway) : null;
+    const resultat = total === null ? '' : (total <= 3 ? 'Under 3.5 (gagné)' : 'Over 3.5 (perdu)');
+    return [e.rangeeLabel, e.intervalLabel, e.cote, e.htHome, e.htAway, e.ftHome, e.ftAway, resultat].join(',');
+  });
+  const csv = [header.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `bbs-journee-${dateStr}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  return true;
+}
+
+async function clearDailyPicks(){
+  const exported = exportDayJournal(todayStr());
+  if (dailyPicks.length === 0) return;
+  if (!confirm(exported
+    ? 'Le récapitulatif du jour vient d\'être téléchargé. Vider les pronostics du jour restants (non joués) ?'
+    : 'Vider tous les pronostics du jour ?')) return;
+  dailyPicks = [];
+  saveDailyPicks();
+  renderDailyPicks();
+}
+
+function renderDailyPicks(){
+  const el = document.getElementById('daily-picks-results');
+  if (dailyPicks.length === 0){
+    el.innerHTML = '<div class="empty">Aucun match ajouté pour aujourd\'hui</div>';
+    return;
+  }
+
+  const tierRank = { fiable: 0, '': 1, insuffisant: 2 };
+  const computed = dailyPicks.map(p => {
+    const rec = computeDailyRecommendation(p.rangeeId, p.intervalId, p.cote);
+    const conf = rec && rec.top ? confidenceTag(rec.top.total) : confidenceTag(0);
+    return { pick: p, rec, conf };
+  }).sort((a,b) => {
+    const ta = tierRank[a.conf.cls] ?? 1;
+    const tb = tierRank[b.conf.cls] ?? 1;
+    if (ta !== tb) return ta - tb;
+    const pa = a.rec && a.rec.top ? a.rec.top.pct : 0;
+    const pb = b.rec && b.rec.top ? b.rec.top.pct : 0;
+    return pb - pa;
+  });
+
+  el.innerHTML = `
+    <div style="overflow-x:auto;">
+      <table style="margin-top:10px;">
+        <thead>
+          <tr><th>Match</th><th>Rangée / Intervalle</th><th>Cote</th><th>Tranche</th><th>Option recommandée</th><th>Fiabilité</th><th>Confiance</th><th>Score HT</th><th>Score FT</th><th></th></tr>
+        </thead>
+        <tbody>
+          ${computed.map(({pick, rec, conf}) => `
+            <tr>
+              <td>${pick.label}</td>
+              <td>${rec ? rec.rangeeLabel + ' / ' + rec.intervalLabel : '—'}</td>
+              <td>${pick.cote}</td>
+              <td>${rec ? rec.range : '—'}</td>
+              <td>${rec && rec.top ? rec.top.label : 'Pas de données dans cette tranche'}</td>
+              <td>${rec && rec.top ? `<span class="tag ${rec.top.pct >= 60 ? 'hit' : 'miss'}">${rec.top.pct}%</span>` : '—'}</td>
+              <td><span class="tag ${conf.cls}">${conf.label}</span></td>
+              <td>
+                <div class="inline">
+                  <input type="number" min="0" class="w-sm" id="dp-ht-h-${pick.id}">
+                  <span>—</span>
+                  <input type="number" min="0" class="w-sm" id="dp-ht-a-${pick.id}">
+                </div>
+              </td>
+              <td>
+                <div class="inline">
+                  <input type="number" min="0" class="w-sm" id="dp-ft-h-${pick.id}">
+                  <span>—</span>
+                  <input type="number" min="0" class="w-sm" id="dp-ft-a-${pick.id}">
+                </div>
+              </td>
+              <td style="white-space:nowrap;">
+                <button class="small" onclick="finalizeDailyPick('${pick.id}')">✓ Enregistrer</button>
+                <button class="ghost danger small" onclick="deleteDailyPick('${pick.id}')">✕</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="footnote">Trié par fiabilité : d'abord les picks "fiable" (10+ données dans la tranche), puis "à confirmer", puis "insuffisant". Une fois le score FT rentré et "Enregistrer" cliqué, le match est archivé dans son intervalle et sort de cette liste.</div>
+  `;
+}
+
 async function load(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -397,7 +877,21 @@ async function load(){
       rangees.push({ id: fr.id, label: fr.label, intervals: [] });
     }
   });
+  // Pré-crée les intervalles définis pour chaque rangée, sans doublonner si déjà présents
+  FIXED_RANGEES.forEach(fr => {
+    const r = rangees.find(x => x.id === fr.id);
+    const labels = FIXED_INTERVALS[fr.id] || [];
+    labels.forEach(label => {
+      if (!r.intervals.find(iv => iv.label === label)){
+        r.intervals.push({ id: uid(), label, entries: [] });
+      }
+    });
+  });
+  await save();
   renderAll();
+  loadDailyPicks();
+  populateDailyRangeeOptions();
+  renderDailyPicks();
 }
 
 async function save(){
@@ -552,16 +1046,33 @@ function renderIntervalBlock(rangeeId, iv){
             ? `<span class="tag hit">FT -3.5 ✓ (total ${total})</span>`
             : `<span class="tag miss">FT +3.5 ✗ (total ${total})</span>`;
         }
+        const isSelected = selectedEntryIds.has(e.id);
         return `
-          <tr>
-            <td>${e.cote !== '' ? e.cote : '—'}</td>
+          <tr class="${isSelected ? 'row-selected' : ''}"
+              onpointerdown="startLongPress('${e.id}')"
+              onpointerup="cancelLongPress()"
+              onpointerleave="cancelLongPress()">
+            <td>${isSelected ? '✓ ' : ''}${e.cote !== '' ? e.cote : '—'}</td>
             <td>${e.htHome !== '' ? e.htHome : '–'}-${e.htAway !== '' ? e.htAway : '–'}</td>
             <td>${e.ftHome !== '' ? e.ftHome : '–'}-${e.ftAway !== '' ? e.ftAway : '–'}</td>
             <td>${resultCell}</td>
-            <td><button class="ghost danger small" onclick="deleteEntry('${rangeeId}','${iv.id}','${e.id}')">✕</button></td>
+            <td>
+              <button class="ghost small" onclick="event.stopPropagation();startEditEntry('${rangeeId}','${iv.id}','${e.id}')">Modifier</button>
+              <button class="ghost danger small" onclick="event.stopPropagation();deleteEntry('${rangeeId}','${iv.id}','${e.id}')">✕</button>
+            </td>
           </tr>
         `;
       }).join('');
+
+  const selectionBar = selectedEntryIds.size > 0
+    ? `<div class="selection-bar">
+         <span><span class="count">${selectedEntryIds.size}</span> entrée(s) sélectionnée(s) — appui long pour cocher/décocher</span>
+         <span>
+           <button class="ghost danger small" onclick="deleteSelected('${rangeeId}','${iv.id}')">Supprimer la sélection</button>
+           <button class="ghost small" onclick="selectedEntryIds.clear(); renderRangeeBody();">Désélectionner</button>
+         </span>
+       </div>`
+    : '';
 
   return `
     <div class="interval-block">
@@ -582,26 +1093,30 @@ function renderIntervalBlock(rangeeId, iv){
         <div class="add-entry-row">
           <div>
             <label>Cote -3.5</label>
-            <input type="number" step="0.01" class="w-sm" id="e-cote-${iv.id}" placeholder="1,40">
+            <input type="number" step="0.01" class="w-sm" id="e-cote-${iv.id}" placeholder="1,40" value="${editingEntryId && iv.entries.find(e=>e.id===editingEntryId) ? iv.entries.find(e=>e.id===editingEntryId).cote : ''}">
           </div>
           <div>
             <label>Score HT</label>
             <div class="inline">
-              <input type="number" min="0" class="w-sm" id="e-ht-h-${iv.id}">
+              <input type="number" min="0" class="w-sm" id="e-ht-h-${iv.id}" value="${editingEntryId && iv.entries.find(e=>e.id===editingEntryId) ? iv.entries.find(e=>e.id===editingEntryId).htHome : ''}">
               <span>—</span>
-              <input type="number" min="0" class="w-sm" id="e-ht-a-${iv.id}">
+              <input type="number" min="0" class="w-sm" id="e-ht-a-${iv.id}" value="${editingEntryId && iv.entries.find(e=>e.id===editingEntryId) ? iv.entries.find(e=>e.id===editingEntryId).htAway : ''}">
             </div>
           </div>
           <div>
             <label>Score FT</label>
             <div class="inline">
-              <input type="number" min="0" class="w-sm" id="e-ft-h-${iv.id}">
+              <input type="number" min="0" class="w-sm" id="e-ft-h-${iv.id}" value="${editingEntryId && iv.entries.find(e=>e.id===editingEntryId) ? iv.entries.find(e=>e.id===editingEntryId).ftHome : ''}">
               <span>—</span>
-              <input type="number" min="0" class="w-sm" id="e-ft-a-${iv.id}">
+              <input type="number" min="0" class="w-sm" id="e-ft-a-${iv.id}" value="${editingEntryId && iv.entries.find(e=>e.id===editingEntryId) ? iv.entries.find(e=>e.id===editingEntryId).ftAway : ''}">
             </div>
           </div>
-          <button onclick="addEntry('${rangeeId}','${iv.id}')">+ Enregistrer</button>
+          ${editingEntryId && iv.entries.find(e=>e.id===editingEntryId)
+            ? `<button onclick="saveEditEntry('${rangeeId}','${iv.id}','${editingEntryId}')">Enregistrer</button><button class="ghost" onclick="cancelEditEntry()">Annuler</button>`
+            : `<button onclick="addEntry('${rangeeId}','${iv.id}')">+ Enregistrer</button>`
+          }
         </div>
+        ${selectionBar}
         <div style="overflow-x:auto;">
           <table>
             <thead>
@@ -619,12 +1134,16 @@ function renderAll(){
   renderTabs();
   renderGlobalStats();
   renderRangeeBody();
+  if (document.getElementById('daily-picks-results')) renderDailyPicks();
 }
 
 async function addInterval(rangeeId){
   const input = document.getElementById('new-interval-label');
   const label = input.value.trim();
-  if (!label) return;
+  if (!label){
+    alert('Renseigne un libellé pour l\'intervalle avant de le créer.');
+    return;
+  }
   const r = rangees.find(x => x.id === rangeeId);
   if (!r) return;
   const iv = { id: uid(), label, entries: [] };
@@ -632,6 +1151,7 @@ async function addInterval(rangeeId){
   openIntervalId = iv.id;
   await save();
   renderAll();
+  populateDailyIntervalOptions();
 }
 
 async function deleteInterval(rangeeId, ivId){
@@ -641,6 +1161,7 @@ async function deleteInterval(rangeeId, ivId){
   r.intervals = r.intervals.filter(iv => iv.id !== ivId);
   await save();
   renderAll();
+  populateDailyIntervalOptions();
 }
 
 function toggleInterval(id){
@@ -655,12 +1176,17 @@ async function addEntry(rangeeId, ivId){
   const ftHome = document.getElementById(`e-ft-h-${ivId}`).value;
   const ftAway = document.getElementById(`e-ft-a-${ivId}`).value;
 
+  if (cote === '' || ftHome === '' || ftAway === ''){
+    alert('Renseigne au minimum la cote -3.5 et le score final (FT) avant d\'enregistrer.');
+    return;
+  }
+
   const r = rangees.find(x => x.id === rangeeId);
   if (!r) return;
   const iv = r.intervals.find(x => x.id === ivId);
   if (!iv) return;
 
-  iv.entries.push({ id: uid(), cote, htHome, htAway, ftHome, ftAway });
+  iv.entries.push({ id: uid(), cote, htHome, htAway, ftHome, ftAway, date: todayStr() });
   openIntervalId = ivId;
   await save();
   renderAll();
@@ -672,6 +1198,47 @@ async function deleteEntry(rangeeId, ivId, entryId){
   const iv = r.intervals.find(x => x.id === ivId);
   if (!iv) return;
   iv.entries = iv.entries.filter(e => e.id !== entryId);
+  await save();
+  renderAll();
+}
+
+function startEditEntry(rangeeId, ivId, entryId){
+  editingEntryId = entryId;
+  openIntervalId = ivId;
+  renderRangeeBody();
+}
+
+function cancelEditEntry(){
+  editingEntryId = null;
+  renderRangeeBody();
+}
+
+async function saveEditEntry(rangeeId, ivId, entryId){
+  const cote = document.getElementById(`e-cote-${ivId}`).value;
+  const htHome = document.getElementById(`e-ht-h-${ivId}`).value;
+  const htAway = document.getElementById(`e-ht-a-${ivId}`).value;
+  const ftHome = document.getElementById(`e-ft-h-${ivId}`).value;
+  const ftAway = document.getElementById(`e-ft-a-${ivId}`).value;
+
+  if (cote === '' || ftHome === '' || ftAway === ''){
+    alert('Renseigne au minimum la cote -3.5 et le score final (FT) avant d\'enregistrer.');
+    return;
+  }
+
+  const r = rangees.find(x => x.id === rangeeId);
+  if (!r) return;
+  const iv = r.intervals.find(x => x.id === ivId);
+  if (!iv) return;
+  const entry = iv.entries.find(e => e.id === entryId);
+  if (!entry) return;
+
+  entry.cote = cote;
+  entry.htHome = htHome;
+  entry.htAway = htAway;
+  entry.ftHome = ftHome;
+  entry.ftAway = ftAway;
+
+  editingEntryId = null;
   await save();
   renderAll();
 }
