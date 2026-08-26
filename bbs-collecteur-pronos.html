@@ -992,8 +992,17 @@ function renderIntervalBlock(rangeeId, iv){
   const top = analysis.ranked[0];
   const buckets = analyzeByCoteBucket(iv.entries);
 
+  // Détecte une dégradation récente : compare le % global à celui des 10 derniers matchs joués.
+  const completed = iv.entries.filter(hasFT);
+  const recentEntries = completed.slice(-10);
+  const recentAnalysis = completed.length >= 10 ? analyzeMarkets(recentEntries) : null;
+  const recentByLabel = {};
+  if (recentAnalysis) recentAnalysis.ranked.forEach(m => { recentByLabel[m.label] = m; });
+
   const marketRows = analysis.ranked.map((m, idx) => {
     const conf = confidenceTag(m.total);
+    const recent = recentByLabel[m.label];
+    const showWarning = recent && (m.pct - recent.pct) >= 15;
     return `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;">
       <div style="width:120px;font-size:11.5px;font-family:var(--mono);${idx===0?'color:var(--accent);font-weight:700;':'color:var(--dim);'}">${m.label}</div>
@@ -1001,6 +1010,7 @@ function renderIntervalBlock(rangeeId, iv){
       <div style="width:78px;text-align:right;font-size:11px;">${m.pct}% <span style="color:var(--dim-soft);">(${m.hit}/${m.total})</span></div>
       ${idx===0 ? '<span class="tag top">top</span>' : '<span style="width:38px;"></span>'}
       <span class="tag ${conf.cls}" style="width:74px;text-align:center;">${conf.label}</span>
+      ${showWarning ? `<span class="tag miss" title="10 derniers matchs : ${recent.pct}%">⚠️ ${recent.pct}% (10 derniers)</span>` : ''}
     </div>
   `;}).join('');
 
@@ -1090,6 +1100,15 @@ function renderIntervalBlock(rangeeId, iv){
           <h2 style="margin-top:14px;">Constat — par tranche de cote -3.5</h2>
           ${bucketTable}
         </div>
+        ${editingEntryId && iv.entries.find(e=>e.id===editingEntryId) ? '' : `
+        <div class="add-entry-row" style="background:transparent;border-style:solid;">
+          <div style="flex:1;min-width:200px;">
+            <label>Saisie rapide (cote espace HT espace FT — ex: 140 11 21)</label>
+            <input type="text" class="w-full" id="quick-${iv.id}" placeholder="140 11 21" onkeydown="if(event.key==='Enter'){event.preventDefault();quickAdd('${rangeeId}','${iv.id}');}">
+          </div>
+          <button onclick="quickAdd('${rangeeId}','${iv.id}')">⚡ Ajouter</button>
+        </div>
+        `}
         <div class="add-entry-row">
           <div>
             <label>Cote -3.5</label>
@@ -1167,6 +1186,36 @@ async function deleteInterval(rangeeId, ivId){
 function toggleInterval(id){
   openIntervalId = openIntervalId === id ? null : id;
   renderRangeeBody();
+}
+
+// Découpe une saisie rapide "140 11 21" -> cote 1.40, HT 1-1, FT 2-1.
+// Règle : cote = chiffres / 100 (2 décimales) ; scores = 1 chiffre par équipe (0-9 chacune).
+function parseQuickEntry(raw){
+  const parts = raw.trim().split(/\s+/);
+  if (parts.length !== 3) return null;
+  const [coteRaw, htRaw, ftRaw] = parts;
+  if (!/^\d+$/.test(coteRaw) || !/^\d{2}$/.test(htRaw) || !/^\d{2}$/.test(ftRaw)) return null;
+  return {
+    cote: (parseInt(coteRaw, 10) / 100).toFixed(2),
+    htHome: htRaw[0], htAway: htRaw[1],
+    ftHome: ftRaw[0], ftAway: ftRaw[1]
+  };
+}
+
+async function quickAdd(rangeeId, ivId){
+  const input = document.getElementById(`quick-${ivId}`);
+  const parsed = parseQuickEntry(input.value);
+  if (!parsed){
+    alert('Format non reconnu. Exemple : 140 11 21 (cote, score HT, score FT — un chiffre par équipe).');
+    return;
+  }
+  document.getElementById(`e-cote-${ivId}`).value = parsed.cote;
+  document.getElementById(`e-ht-h-${ivId}`).value = parsed.htHome;
+  document.getElementById(`e-ht-a-${ivId}`).value = parsed.htAway;
+  document.getElementById(`e-ft-h-${ivId}`).value = parsed.ftHome;
+  document.getElementById(`e-ft-a-${ivId}`).value = parsed.ftAway;
+  input.value = '';
+  await addEntry(rangeeId, ivId);
 }
 
 async function addEntry(rangeeId, ivId){
