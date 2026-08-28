@@ -339,6 +339,14 @@
     <div id="daily-picks-results"></div>
   </div>
 
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 style="margin:0;">📊 Tracker de performance — indépendant de l'historique</h2>
+      <button class="ghost danger small" onclick="clearPerformanceLog()">Vider le suivi</button>
+    </div>
+    <div id="performance-tracker"></div>
+  </div>
+
   <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px;">
     <button class="ghost small" onclick="exportJSON()">⭳ Exporter JSON</button>
     <button class="ghost small" onclick="exportCSV()">⭳ Exporter CSV</button>
@@ -656,6 +664,144 @@ function exportCSV(){
   URL.revokeObjectURL(url);
 }
 
+// ===== Tracker de performance — module indépendant, stockage séparé =====
+// N'écrit jamais dans `rangees` et ne modifie jamais l'archivage par intervalle.
+const PERF_STORAGE = 'bbs-performance-log';
+let performanceLog = [];
+
+function loadPerformanceLog(){
+  try{
+    const raw = localStorage.getItem(PERF_STORAGE);
+    performanceLog = raw ? JSON.parse(raw) : [];
+  } catch(err){
+    performanceLog = [];
+  }
+}
+function savePerformanceLog(){
+  try{
+    localStorage.setItem(PERF_STORAGE, JSON.stringify(performanceLog));
+  } catch(err){
+    console.error('Storage error', err);
+  }
+}
+
+function testMarketByLabel(label, scores){
+  const hasFt = scores.ftHome !== '' && scores.ftAway !== '';
+  const hasHt = scores.htHome !== '' && scores.htAway !== '';
+  const ftTotal = hasFt ? parseInt(scores.ftHome) + parseInt(scores.ftAway) : null;
+  const htTotal = hasHt ? parseInt(scores.htHome) + parseInt(scores.htAway) : null;
+
+  const def = MARKET_DEFS.find(m => m.label === label);
+  if (def){
+    const val = def.scope === 'ft' ? ftTotal : htTotal;
+    return val === null ? null : def.test(val);
+  }
+  if (label === 'FT 12 (pas de nul)'){
+    if (!hasFt) return null;
+    return parseInt(scores.ftHome) !== parseInt(scores.ftAway);
+  }
+  if (label === 'BTTS Oui'){
+    if (!hasFt) return null;
+    return parseInt(scores.ftHome) > 0 && parseInt(scores.ftAway) > 0;
+  }
+  if (label === 'BTTS Non'){
+    if (!hasFt) return null;
+    return !(parseInt(scores.ftHome) > 0 && parseInt(scores.ftAway) > 0);
+  }
+  return null;
+}
+
+function logPerformance(pick, rec, scores){
+  if (!rec || !rec.top) return; // pas de recommandation connue, rien à tracker
+  const won = testMarketByLabel(rec.top.label, scores);
+  performanceLog.push({
+    id: uid(),
+    date: todayStr(),
+    label: pick.label,
+    rangeeLabel: rec.rangeeLabel,
+    intervalLabel: rec.intervalLabel,
+    option: rec.top.label,
+    cote: pick.cote,
+    result: won === null ? 'inconnu' : (won ? 'gagné' : 'perdu')
+  });
+  savePerformanceLog();
+}
+
+async function togglePerformanceResult(id){
+  const entry = performanceLog.find(e => e.id === id);
+  if (!entry) return;
+  entry.result = entry.result === 'gagné' ? 'perdu' : 'gagné';
+  savePerformanceLog();
+  renderPerformanceTracker();
+}
+
+async function deletePerformanceEntry(id){
+  performanceLog = performanceLog.filter(e => e.id !== id);
+  savePerformanceLog();
+  renderPerformanceTracker();
+}
+
+async function clearPerformanceLog(){
+  if (performanceLog.length === 0) return;
+  if (!confirm('Effacer tout le suivi de performance ? (n\'affecte pas ton historique de matchs)')) return;
+  performanceLog = [];
+  savePerformanceLog();
+  renderPerformanceTracker();
+}
+
+function renderPerformanceTracker(){
+  const el = document.getElementById('performance-tracker');
+  if (!el) return;
+
+  if (performanceLog.length === 0){
+    el.innerHTML = '<div class="empty">Aucun résultat suivi pour le moment — se remplit automatiquement à chaque match enregistré.</div>';
+    return;
+  }
+
+  const won = performanceLog.filter(e => e.result === 'gagné').length;
+  const lost = performanceLog.filter(e => e.result === 'perdu').length;
+  const unknown = performanceLog.filter(e => e.result === 'inconnu').length;
+  const known = won + lost;
+  const pct = known > 0 ? Math.round((won/known)*100) : 0;
+
+  const sorted = [...performanceLog].sort((a,b) => b.id.localeCompare(a.id));
+
+  el.innerHTML = `
+    <div class="global-stats" style="margin-bottom:12px;">
+      <div class="stat">
+        <div class="label">Réussite globale</div>
+        <div class="value" style="color:var(--accent);">${pct}%</div>
+        <div class="footnote">${won} gagné(s) / ${lost} perdu(s)${unknown ? ' / ' + unknown + ' à confirmer' : ''}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Total suivi</div>
+        <div class="value">${performanceLog.length}</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Date</th><th>Match</th><th>Rangée/Intervalle</th><th>Option jouée</th><th>Résultat</th><th></th></tr></thead>
+        <tbody>
+          ${sorted.map(e => `
+            <tr>
+              <td>${e.date}</td>
+              <td>${e.label}</td>
+              <td>${e.rangeeLabel} / ${e.intervalLabel}</td>
+              <td>${e.option}</td>
+              <td><span class="tag ${e.result==='gagné'?'hit':e.result==='perdu'?'miss':''}">${e.result}</span></td>
+              <td style="white-space:nowrap;">
+                <button class="ghost small" onclick="togglePerformanceResult('${e.id}')">Corriger</button>
+                <button class="ghost danger small" onclick="deletePerformanceEntry('${e.id}')">✕</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="footnote">"Corriger" bascule gagné/perdu si tu as joué une autre option que celle recommandée. Ce suivi est indépendant de ton historique de collecte.</div>
+  `;
+}
+
 function loadDailyPicks(){
   try{
     const raw = localStorage.getItem(DAILY_STORAGE);
@@ -754,6 +900,11 @@ async function finalizeDailyPick(pickId){
   const iv = r.intervals.find(x => x.id === pick.intervalId);
   if (!iv) return;
 
+  // Capture la recommandation AVANT d'archiver (reflète l'état au moment de la décision),
+  // pour le tracker de performance — totalement séparé de l'archivage ci-dessous.
+  const rec = computeDailyRecommendation(pick.rangeeId, pick.intervalId, pick.cote);
+  logPerformance(pick, rec, { htHome, htAway, ftHome, ftAway });
+
   iv.entries.push({ id: uid(), cote: pick.cote, htHome, htAway, ftHome, ftAway, date: todayStr() });
   await save();
 
@@ -822,7 +973,28 @@ function renderDailyPicks(){
     return pb - pa;
   });
 
+  const top5 = computed.filter(c => c.conf.cls === 'hit' && c.rec && c.rec.top).slice(0, 5);
+  const top5Block = top5.length === 0 ? '' : `
+    <div class="featured-panel" style="margin-bottom:14px;">
+      <h2>🏆 Top ${top5.length} du jour — fiable</h2>
+      <table>
+        <thead><tr><th>#</th><th>Match</th><th>Option</th><th>%</th></tr></thead>
+        <tbody>
+          ${top5.map((c, i) => `
+            <tr>
+              <td>${i+1}</td>
+              <td>${c.pick.label}</td>
+              <td>${c.rec.top.label}</td>
+              <td><span class="tag hit">${c.rec.top.pct}%</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
   el.innerHTML = `
+    ${top5Block}
     <div style="overflow-x:auto;">
       <table style="margin-top:10px;">
         <thead>
@@ -892,6 +1064,8 @@ async function load(){
   loadDailyPicks();
   populateDailyRangeeOptions();
   renderDailyPicks();
+  loadPerformanceLog();
+  renderPerformanceTracker();
 }
 
 async function save(){
