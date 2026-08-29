@@ -973,28 +973,42 @@ function renderDailyPicks(){
     return pb - pa;
   });
 
-  const top5 = computed.filter(c => c.conf.cls === 'hit' && c.rec && c.rec.top).slice(0, 5);
-  const top5Block = top5.length === 0 ? '' : `
+  // Dédoublonne par signal statistique (même rangée + intervalle + option = même donnée historique,
+  // pas un signal indépendant) avant de prendre les meilleurs, jusqu'à 15 au lieu de 5.
+  const fiablePicks = computed.filter(c => c.conf.cls === 'hit' && c.rec && c.rec.top);
+  const seenSignals = new Set();
+  const topPicks = [];
+  for (const c of fiablePicks){
+    const key = `${c.pick.rangeeId}|${c.pick.intervalId}|${c.rec.top.label}`;
+    if (seenSignals.has(key)) continue;
+    seenSignals.add(key);
+    topPicks.push(c);
+    if (topPicks.length >= 15) break;
+  }
+
+  const topBlock = topPicks.length === 0 ? '' : `
     <div class="featured-panel" style="margin-bottom:14px;">
-      <h2>🏆 Top ${top5.length} du jour — fiable</h2>
+      <h2>🏆 Top ${topPicks.length} du jour — fiable (doublons de signal filtrés)</h2>
       <table>
-        <thead><tr><th>#</th><th>Match</th><th>Option</th><th>%</th></tr></thead>
+        <thead><tr><th>#</th><th>Match</th><th>Rangée/Intervalle</th><th>Option</th><th>%</th></tr></thead>
         <tbody>
-          ${top5.map((c, i) => `
+          ${topPicks.map((c, i) => `
             <tr>
               <td>${i+1}</td>
               <td>${c.pick.label}</td>
+              <td>${c.rec.rangeeLabel} / ${c.rec.intervalLabel}</td>
               <td>${c.rec.top.label}</td>
               <td><span class="tag hit">${c.rec.top.pct}%</span></td>
             </tr>
           `).join('')}
         </tbody>
       </table>
+      <div class="footnote">Un seul pick affiché par combinaison rangée + intervalle + option identique — les répétitions du même signal statistique sont masquées ici (mais restent visibles dans le tableau complet ci-dessous).</div>
     </div>
   `;
 
   el.innerHTML = `
-    ${top5Block}
+    ${topBlock}
     <div style="overflow-x:auto;">
       <table style="margin-top:10px;">
         <thead>
