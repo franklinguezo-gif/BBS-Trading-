@@ -749,6 +749,13 @@ async function clearPerformanceLog(){
   renderPerformanceTracker();
 }
 
+let showPerfDetail = false;
+
+function togglePerfDetail(){
+  showPerfDetail = !showPerfDetail;
+  renderPerformanceTracker();
+}
+
 function renderPerformanceTracker(){
   const el = document.getElementById('performance-tracker');
   if (!el) return;
@@ -766,19 +773,8 @@ function renderPerformanceTracker(){
 
   const sorted = [...performanceLog].sort((a,b) => b.id.localeCompare(a.id));
 
-  el.innerHTML = `
-    <div class="global-stats" style="margin-bottom:12px;">
-      <div class="stat">
-        <div class="label">Réussite globale</div>
-        <div class="value" style="color:var(--accent);">${pct}%</div>
-        <div class="footnote">${won} gagné(s) / ${lost} perdu(s)${unknown ? ' / ' + unknown + ' à confirmer' : ''}</div>
-      </div>
-      <div class="stat">
-        <div class="label">Total suivi</div>
-        <div class="value">${performanceLog.length}</div>
-      </div>
-    </div>
-    <div style="overflow-x:auto;">
+  const detailBlock = !showPerfDetail ? '' : `
+    <div style="overflow-x:auto;margin-top:12px;">
       <table>
         <thead><tr><th>Date</th><th>Match</th><th>Rangée/Intervalle</th><th>Option jouée</th><th>Résultat</th><th></th></tr></thead>
         <tbody>
@@ -798,7 +794,23 @@ function renderPerformanceTracker(){
         </tbody>
       </table>
     </div>
-    <div class="footnote">"Corriger" bascule gagné/perdu si tu as joué une autre option que celle recommandée. Ce suivi est indépendant de ton historique de collecte.</div>
+    <div class="footnote">"Corriger" bascule gagné/perdu si tu as joué une autre option que celle recommandée.</div>
+  `;
+
+  el.innerHTML = `
+    <div class="global-stats" style="margin-bottom:12px;">
+      <div class="stat">
+        <div class="label">Réussite globale</div>
+        <div class="value" style="color:var(--accent);">${pct}%</div>
+        <div class="footnote">${won} gagné(s) / ${lost} perdu(s)${unknown ? ' / ' + unknown + ' à confirmer' : ''}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Total suivi</div>
+        <div class="value">${performanceLog.length}</div>
+      </div>
+    </div>
+    <button class="ghost small" onclick="togglePerfDetail()">${showPerfDetail ? 'Masquer le détail' : 'Voir le détail (' + performanceLog.length + ')'}</button>
+    ${detailBlock}
   `;
 }
 
