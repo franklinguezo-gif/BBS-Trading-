@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AVIATOR.LOG</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --night1:#0b0620;
+    --night2:#160a35;
+    --night3:#1f0f4a;
+    --card:rgba(18,12,42,0.78);
+    --card-border:rgba(140,110,255,0.22);
+    --text:#e8e3ff;
+    --muted:#9c8fc9;
+    --red:#ff3b5c;
+    --red-d:#c0233f;
+    --green:#2ee6a6;
+    --green-d:#17a97a;
+    --gold:#ffcf5c;
+    --line:#5b3fd6;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:'Segoe UI',Roboto,Arial,sans-serif;
+    color:var(--text);
+    min-height:100vh;
+    overflow-x:hidden;
+    position:relative;
+    background:
+      radial-gradient(ellipse at 20% 100%, rgba(255,60,90,0.18), transparent 55%),
+      radial-gradient(ellipse at 80% 0%, rgba(120,80,255,0.22), transparent 55%),
+      linear-gradient(160deg, var(--night1), var(--night2) 55%, var(--night3));
+  }
+
+  #bgCanvas{
+    position:fixed; inset:0; width:100%; height:100%; z-index:0; opacity:0.5;
+  }
+  .stars{ position:fixed; inset:0; z-index:0; pointer-events:none; }
+  .star{
+    position:absolute; width:2px; height:2px; background:#fff; border-radius:50%;
+    opacity:0.5; animation:twinkle 3s ease-in-out infinite;
+  }
+  @keyframes twinkle{ 0%,100%{opacity:0.15;} 50%{opacity:0.8;} }
+
+  .wrap{
+    position:relative; z-index:1; max-width:480px; margin:0 auto;
+    padding:18px 16px 60px; min-height:100vh;
+  }
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:16px; flex-wrap:wrap; gap:10px;
+  }
+  header h1{ font-size:1.15rem; letter-spacing:1px; font-family:'Courier New',monospace; font-weight:800; }
+  header h1 .dot{color:var(--red);}
+  .capital-badge{
+    background:rgba(0,0,0,0.3); border:1px solid var(--card-border); border-radius:20px;
+    padding:6px 14px; font-size:0.78rem; color:var(--muted); display:flex; align-items:center; gap:6px;
+  }
+  .capital-badge b{color:var(--green); font-family:'Courier New',monospace;}
+  .capital-badge button{ background:none; border:none; color:var(--muted); font-size:0.9rem; cursor:pointer; padding:0 0 0 4px; }
+
+  .card{
+    background:var(--card); border:1px solid var(--card-border); backdrop-filter:blur(10px);
+    border-radius:16px; padding:16px; margin-bottom:14px; box-shadow:0 8px 30px rgba(0,0,0,0.35);
+  }
+  .card h2{ font-size:0.7rem; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin-bottom:12px; }
+
+  .input-row{ margin-bottom:12px; }
+  .input-row label{ display:block; font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:5px; }
+  input[type=number], input[type=text], input[type=date]{
+    width:100%; background:rgba(0,0,0,0.25); border:1px solid var(--card-border); color:var(--text);
+    padding:11px 12px; border-radius:10px; font-size:1rem;
+  }
+  input:focus{outline:1px solid var(--line);}
+  .mise-preview{ font-size:0.78rem; color:var(--gold); margin-top:8px; min-height:16px; }
+  .btn-primary{
+    width:100%; margin-top:6px; padding:13px; border:none; border-radius:10px;
+    background:linear-gradient(135deg,#6c3bff,#9c5bff); color:#fff; font-weight:700; font-size:0.95rem; cursor:pointer;
+  }
+  .btn-primary:active{filter:brightness(0.9);}
+
+  .stats-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+  .stat-box{ background:var(--card); border:1px solid var(--card-border); border-radius:14px; padding:12px 6px; text-align:center; }
+  .stat-box .value{ font-size:1.15rem; font-weight:800; }
+  .stat-box .value.green{color:var(--green);}
+  .stat-box .value.red{color:var(--red);}
+  .stat-box .label{ font-size:0.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px; }
+
+  /* ---- Session en cours ---- */
+  .timer-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:rgba(0,0,0,0.25); border:1px solid var(--card-border); border-radius:12px;
+    padding:10px 14px; margin-bottom:14px;
+  }
+  .timer-row .timer-label{ font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
+  .timer-row .timer-value{ font-size:1.2rem; font-weight:800; font-family:'Courier New',monospace; color:var(--gold); }
+  .timer-row .timer-value.expired{ color:var(--red); }
+
+  .round-display{ text-align:center; margin-bottom:10px; }
+  .round-display .tour-label{ font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; }
+  .round-display .tour-num{
+    font-size:2.4rem; font-weight:800; line-height:1.1;
+    background:linear-gradient(90deg,var(--gold),var(--red));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+
+  .score-row{ display:flex; justify-content:center; gap:24px; margin:6px 0 14px; }
+  .score-item{ text-align:center; }
+  .score-item .n{ font-size:1.3rem; font-weight:700; }
+  .score-item .l{ font-size:0.62rem; color:var(--muted); text-transform:uppercase; }
+  .score-item.win .n{color:var(--green);}
+  .score-item.loss .n{color:var(--red);}
+
+  .action-row{ display:flex; gap:12px; margin-bottom:12px; }
+  .btn-round{
+    flex:1; padding:22px 10px; border:none; border-radius:14px; font-size:1.05rem; font-weight:800;
+    color:#fff; cursor:pointer; letter-spacing:0.5px; transition:transform 0.08s ease;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+  .btn-round:active{transform:scale(0.95);}
+  .btn-round:disabled{ opacity:0.35; cursor:not-allowed; transform:none; }
+  .btn-round.win{background:linear-gradient(135deg,var(--green-d),var(--green)); box-shadow:0 6px 20px rgba(46,230,166,0.25);}
+  .btn-round.loss{background:linear-gradient(135deg,var(--red-d),var(--red)); box-shadow:0 6px 20px rgba(255,59,92,0.25);}
+  .btn-round span.icon{font-size:1.5rem;}
+
+  .mini-history{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+  .chip{
+    width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+    font-size:0.68rem; font-weight:800;
+  }
+  .chip.win{background:rgba(46,230,166,0.18); color:var(--green); border:1px solid rgba(46,230,166,0.4);}
+  .chip.loss{background:rgba(255,59,92,0.18); color:var(--red); border:1px solid rgba(255,59,92,0.4);}
+
+  .btn-end{
+    width:100%; padding:14px; border:1.5px solid var(--gold); background:transparent; color:var(--gold);
+    border-radius:12px; font-weight:800; font-size:0.95rem; cursor:pointer;
+  }
+  .btn-end:active{background:rgba(255,207,92,0.12);}
+
+  /* ---- Bannière expiration ---- */
+  .banner{
+    display:none; text-align:center; font-weight:800; font-size:0.95rem; padding:16px 14px;
+    border-radius:14px; margin-bottom:14px; line-height:1.4; animation:pulse 1.2s infinite;
+    background:linear-gradient(135deg,#8c1c13,#c0392b); color:#fff; border:2px solid #ff6b5e;
+  }
+  @keyframes pulse{ 0%{transform:scale(1);} 50%{transform:scale(1.02);} 100%{transform:scale(1);} }
+
+  /* ---- Bilan session ---- */
+  .bilan-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:6px; }
+  .bilan-box{ background:rgba(0,0,0,0.25); border:1px solid var(--card-border); border-radius:12px; padding:12px; text-align:center; }
+  .bilan-box.full{grid-column:1/-1;}
+  .bilan-box .label{ font-size:0.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
+  .bilan-box .value{ font-size:1.25rem; font-weight:800; margin-top:3px; }
+  .bilan-box .value.big{font-size:1.7rem;}
+  .bilan-box .value.pos{color:var(--green);}
+  .bilan-box .value.neg{color:var(--red);}
+
+  /* ---- Analyse stratégie ---- */
+  .analyse-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .analyse-box{ background:rgba(0,0,0,0.22); border:1px solid var(--card-border); border-radius:12px; padding:14px 8px; text-align:center; }
+  .analyse-box .value{ font-size:1.3rem; font-weight:800; color:var(--green); font-family:'Courier New',monospace; }
+  .analyse-box .value.neg{color:var(--muted);}
+  .analyse-box .label{ font-size:0.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-top:3px; }
+  .streak-row{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:10px; }
+  .streak-box{ background:rgba(0,0,0,0.22); border:1px solid var(--card-border); border-radius:12px; padding:10px 4px; text-align:center; }
+  .streak-box .value{ font-size:0.95rem; font-weight:800; }
+  .streak-box .label{ font-size:0.58rem; color:var(--muted); text-transform:uppercase; margin-top:2px; }
+  .sample-warning{
+    margin-top:12px; background:rgba(255,207,92,0.08); border:1px solid rgba(255,207,92,0.35);
+    border-radius:12px; padding:12px; font-size:0.78rem; color:var(--gold); line-height:1.45;
+  }
+  .sample-warning b{display:block; margin-bottom:4px;}
+
+  /* ---- Historique ---- */
+  .hist-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .hist-header h2{margin:0;}
+  .clear-btn{ background:none; border:none; color:var(--muted); font-size:0.72rem; cursor:pointer; text-decoration:underline; }
+  .hist-list{ max-height:280px; overflow-y:auto; }
+  .hist-item{
+    display:flex; align-items:center; justify-content:space-between; padding:10px 2px;
+    border-bottom:1px solid rgba(140,110,255,0.15); font-size:0.85rem;
+  }
+  .hist-item:last-child{border-bottom:none;}
+  .hist-left{ display:flex; align-items:center; gap:10px; }
+  .dot-status{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .dot-status.win{background:var(--green);}
+  .dot-status.loss{background:var(--red);}
+  .hist-date{color:var(--muted); font-size:0.75rem;}
+  .hist-right{ display:flex; align-items:center; gap:10px; }
+  .hist-amount.win{color:var(--green); font-weight:700;}
+  .hist-amount.loss{color:var(--red); font-weight:700;}
+  .del-btn{ background:none; border:none; color:var(--muted); font-size:1rem; cursor:pointer; padding:0 2px; }
+  .hist-empty{ text-align:center; color:var(--muted); font-size:0.8rem; padding:16px 0; }
+
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div class="stars" id="stars"></div>
+
+<div class="wrap">
+
+  <!-- ÉCRAN CONFIG : NOUVELLE SESSION -->
+  <div class="card" id="configCard">
+    <h2>Nouvelle session</h2>
+    <div class="input-row">
+      <label for="sessionName">Nom (optionnel)</label>
+      <input type="text" id="sessionName" placeholder="Ex: Session soir">
+    </div>
+    <div class="input-row">
+      <label for="capitalInput">Capital de départ (F)</label>
+      <input type="number" id="capitalInput" value="1000" min="1" step="50">
+      <div class="mise-preview" id="misePreview">Mise recommandée (7%) : —</div>
+    </div>
+    <div class="input-row">
+      <label for="dateInput">Date</label>
+      <input type="date" id="dateInput">
+    </div>
+    <button class="btn-primary" id="startBtn">Démarrer</button>
+  </div>
+
+  <!-- BANNIÈRE EXPIRATION -->
+  <div class="banner" id="expiredBanner">⏰ HEURE SESSION EXPIRÉE<br>Termine ta session maintenant</div>
+
+  <!-- ÉCRAN PRINCIPAL -->
+  <div id="mainScreen" class="hidden">
+
+    <header>
+      <h1>AVIATOR<span class="dot">.</span>LOG</h1>
+      <div class="capital-badge">
+        Capital : <b id="capitalBadge">0f</b>
+        <button id="editCapitalBtn" title="Nouvelle session">↻</button>
+      </div>
+    </header>
+
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="value" id="statSessions">0</div>
+        <div class="label">Sessions</div>
+      </div>
+      <div class="stat-box">
+        <div class="value green" id="statWins">0</div>
+        <div class="label">Gagnées</div>
+      </div>
+      <div class="stat-box">
+        <div class="value red" id="statLosses">0</div>
+        <div class="label">Perdues</div>
+      </div>
+      <div class="stat-box">
+        <div class="value" id="statNetPL">0f</div>
+        <div class="label">Net P&L</div>
+      </div>
+    </div>
+
+    <!-- SESSION EN COURS -->
+    <div class="card" id="liveCard">
+      <h2>Session en cours</h2>
+
+      <div class="timer-row">
+        <span class="timer-label">⏱ Temps écoulé</span>
+        <span class="timer-value" id="timerValue">00:00 / 60:00</span>
+      </div>
+
+      <div class="round-display">
+        <div class="tour-label">Tour</div>
+        <div class="tour-num" id="tourNum">1</div>
+      </div>
+
+      <div class="score-row">
+        <div class="score-item win">
+          <div class="n" id="liveWinCount">0</div>
+          <div class="l">Gagné</div>
+        </div>
+        <div class="score-item loss">
+          <div class="n" id="liveLossCount">0</div>
+          <div class="l">Perdu</div>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn-round win" id="btnGagne">
+          <span class="icon">✅</span> GAGNÉ
+        </button>
+        <button class="btn-round loss" id="btnPerdu">
+          <span class="icon">❌</span> PERDU
+        </button>
+      </div>
+
+      <div class="mini-history" id="miniHistory"></div>
+
+      <button class="btn-end" id="btnFin">🏁 Session terminée</button>
+    </div>
+
+    <!-- BILAN DE SESSION (affiché après clôture) -->
+    <div class="card hidden" id="bilanCard">
+      <h2>Bilan de la session</h2>
+      <div class="bilan-grid">
+        <div class="bilan-box full">
+          <div class="label">Nouveau capital</div>
+          <div class="value big" id="bilanCapital">0f</div>
+        </div>
+        <div class="bilan-box">
+          <div class="label">Tours joués</div>
+          <div class="value" id="bilanRounds">0</div>
+        </div>
+        <div class="bilan-box">
+          <div class="label">Net P&L session</div>
+          <div class="value" id="bilanNetPL">0f</div>
+        </div>
+        <div class="bilan-box">
+          <div class="label">Gagnés</div>
+          <div class="value pos" id="bilanWins">0</div>
+        </div>
+        <div class="bilan-box">
+          <div class="label">Perdus</div>
+          <div class="value neg" id="bilanLosses">0</div>
+        </div>
+      </div>
+      <button class="btn-primary" id="newSessionBtn">Nouvelle session</button>
+    </div>
+
+    <div class="card">
+      <h2>Courbe du capital</h2>
+      <canvas id="capitalChart" height="180"></canvas>
+    </div>
+
+    <div class="card">
+      <h2>Analyse stratégie</h2>
+      <div class="analyse-grid">
+        <div class="analyse-box">
+          <div class="value" id="anWinRate">0.0%</div>
+          <div class="label">Win Rate</div>
+        </div>
+        <div class="analyse-box">
+          <div class="value" id="anROI">+0.0%</div>
+          <div class="label">ROI</div>
+        </div>
+        <div class="analyse-box">
+          <div class="value" id="anGainMoy">—</div>
+          <div class="label">Gain moyen/session</div>
+        </div>
+        <div class="analyse-box">
+          <div class="value neg" id="anPerteMoy">—</div>
+          <div class="label">Perte moy/session</div>
+        </div>
+      </div>
+      <div class="streak-row">
+        <div class="streak-box">
+          <div class="value green" id="anBestStreak">0 W</div>
+          <div class="label">🔥 Meilleure série</div>
+        </div>
+        <div class="streak-box">
+          <div class="value red" id="anWorstStreak">0 L</div>
+          <div class="label">❄️ Pire série</div>
+        </div>
+        <div class="streak-box">
+          <div class="value" id="anCurrentStreak">0</div>
+          <div class="label">Série actuelle</div>
+        </div>
+      </div>
+      <div class="sample-warning" id="sampleWarning">
+        <b>⏳ ÉCHANTILLON INSUFFISANT</b>
+        <span id="sampleText">0/20 sessions minimum. Continue à logger — le verdict sera fiable à partir de 20 sessions.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hist-header">
+        <h2>Historique</h2>
+        <button class="clear-btn" id="clearAllBtn">Tout effacer</button>
+      </div>
+      <div class="hist-list" id="histList"></div>
+      <div class="hist-empty hidden" id="histEmpty">Aucune entrée enregistrée</div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const STORAGE_ENTRIES = 'aviator_log_entries';
+  const STORAGE_CAPITAL = 'aviator_log_capital';
+  const STORAGE_SESSION_START = 'aviator_log_session_start';
+  const STORAGE_SESSION_ROUNDS = 'aviator_log_session_rounds';
+  const SESSION_MAX_MS = 60 * 60 * 1000; // 1h
+
+  const $ = id => document.getElementById(id);
+
+  let capitalInitial = 0;
+  let entries = [];
+  let mise = 0;
+  let sessionStart = null;
+  let sessionRounds = [];
+  let timerInterval = null;
+  let expiredNotified = false;
+  let capitalChart = null;
+
+  const today = () => new Date().toISOString().slice(0,10);
+
+  // ---------- Fond animé façon Aviator ----------
+  const canvas = $('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  function resizeCanvas(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  let t = 0;
+  function drawBg(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const w = canvas.width, h = canvas.height;
+    ctx.beginPath();
+    const baseY = h * 0.92;
+    const amp = h * 0.65;
+    const speed = 0.006;
+    for(let x = 0; x <= w; x += 4){
+      const progress = ((x / w) + t * speed) % 1;
+      const curveShape = Math.pow(progress, 1.8);
+      const y = baseY - curveShape * amp;
+      if(x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(255,60,90,0.35)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+    const grad = ctx.createLinearGradient(0,0,0,h);
+    grad.addColorStop(0, 'rgba(255,60,90,0.12)');
+    grad.addColorStop(1, 'rgba(255,60,90,0)');
+    ctx.fillStyle = grad; ctx.fill();
+    t++;
+    requestAnimationFrame(drawBg);
+  }
+  drawBg();
+
+  const starsContainer = $('stars');
+  for(let i=0;i<40;i++){
+    const s = document.createElement('div');
+    s.className = 'star';
+    s.style.left = Math.random()*100 + '%';
+    s.style.top = Math.random()*70 + '%';
+    s.style.animationDelay = (Math.random()*3) + 's';
+    starsContainer.appendChild(s);
+  }
+
+  // ---------- Stockage local ----------
+  function loadEntries(){
+    try{ return JSON.parse(localStorage.getItem(STORAGE_ENTRIES)) || []; }
+    catch(e){ return []; }
+  }
+  function saveEntries(){ localStorage.setItem(STORAGE_ENTRIES, JSON.stringify(entries)); }
+
+  function loadCapital(){
+    const v = parseFloat(localStorage.getItem(STORAGE_CAPITAL));
+    return isNaN(v) ? null : v;
+  }
+  function saveCapital(v){ localStorage.setItem(STORAGE_CAPITAL, String(v)); }
+
+  function saveSessionState(){
+    if(sessionStart){
+      localStorage.setItem(STORAGE_SESSION_START, String(sessionStart));
+      localStorage.setItem(STORAGE_SESSION_ROUNDS, JSON.stringify(sessionRounds));
+    } else {
+      localStorage.removeItem(STORAGE_SESSION_START);
+      localStorage.removeItem(STORAGE_SESSION_ROUNDS);
+    }
+  }
+
+  function fmt(n){
+    const sign = n > 0 ? '+' : '';
+    return sign + Math.round(n) + 'f';
+  }
+  function fmtTime(ms){
+    const totalSec = Math.max(0, Math.floor(ms/1000));
+    const m = Math.floor(totalSec/60).toString().padStart(2,'0');
+    const s = (totalSec%60).toString().padStart(2,'0');
+    return m + ':' + s;
+  }
+
+  // ---------- Config / démarrage ----------
+  $('capitalInput').addEventListener('input', updateMisePreview);
+  function updateMisePreview(){
+    const cap = parseFloat($('capitalInput').value) || 0;
+    $('misePreview').textContent = 'Mise recommandée (7%) : ' + Math.round(cap * 0.07) + 'f';
+  }
+
+  function initConfigScreen(prefillCapital){
+    $('dateInput').value = today();
+    if(prefillCapital){ $('capitalInput').value = Math.round(prefillCapital); }
+    updateMisePreview();
+  }
+
+  $('startBtn').addEventListener('click', () => {
+    const cap = parseFloat($('capitalInput').value);
+    if(!cap || cap <= 0){
+      alert('Merci de saisir un capital de départ valide.');
+      return;
+    }
+    capitalInitial = cap;
+    mise = cap * 0.07;
+    saveCapital(cap);
+    launchLiveSession();
+  });
+
+  $('editCapitalBtn').addEventListener('click', () => {
+    if(sessionRounds.length > 0){
+      if(!confirm('Une session est en cours avec des tours non enregistrés. Les abandonner ?')) return;
+    }
+    stopTimer();
+    sessionStart = null;
+    sessionRounds = [];
+    saveSessionState();
+    $('mainScreen').classList.add('hidden');
+    $('configCard').classList.remove('hidden');
+    initConfigScreen();
+  });
+
+  function launchLiveSession(){
+    sessionStart = Date.now();
+    sessionRounds = [];
+    expiredNotified = false;
+    saveSessionState();
+
+    $('configCard').classList.add('hidden');
+    $('bilanCard').classList.add('hidden');
+    $('liveCard').classList.remove('hidden');
+    $('expiredBanner').style.display = 'none';
+    $('mainScreen').classList.remove('hidden');
+    setRoundButtonsEnabled(true);
+
+    renderLive();
+    startTimer();
+    renderAll();
+  }
+
+  // ---------- Chrono de session ----------
+  function startTimer(){
+    stopTimer();
+    updateTimerDisplay();
+    timerInterval = setInterval(updateTimerDisplay, 1000);
+  }
+  function stopTimer(){
+    if(timerInterval){ clearInterval(timerInterval); timerInterval = null; }
+  }
+  function updateTimerDisplay(){
+    if(!sessionStart) return;
+    const elapsed = Date.now() - sessionStart;
+    const remaining = SESSION_MAX_MS - elapsed;
+    const el = $('timerValue');
+    el.textContent = fmtTime(elapsed) + ' / 60:00';
+    if(elapsed >= SESSION_MAX_MS){
+      el.classList.add('expired');
+      if(!expiredNotified){
+        expiredNotified = true;
+        onSessionExpired();
+      }
+    } else {
+      el.classList.remove('expired');
+    }
+  }
+
+  function onSessionExpired(){
+    $('expiredBanner').style.display = 'block';
+    setRoundButtonsEnabled(false);
+    try{
+      if('Notification' in window){
+        if(Notification.permission === 'granted'){
+          new Notification('AVIATOR.LOG', { body: '⏰ Heure session expirée — termine ta session.' });
+        } else if(Notification.permission !== 'denied'){
+          Notification.requestPermission().then(p => {
+            if(p === 'granted'){
+              new Notification('AVIATOR.LOG', { body: '⏰ Heure session expirée — termine ta session.' });
+            }
+          });
+        }
+      }
+    }catch(e){ /* notifications non supportées, la bannière suffit */ }
+  }
+
+  function setRoundButtonsEnabled(enabled){
+    $('btnGagne').disabled = !enabled;
+    $('btnPerdu').disabled = !enabled;
+  }
+
+  // ---------- Tap Gagné / Perdu ----------
+  $('btnGagne').addEventListener('click', () => tapRound('win'));
+  $('btnPerdu').addEventListener('click', () => tapRound('loss'));
+
+  function tapRound(result){
+    if(!sessionStart) return;
+    sessionRounds.push(result);
+    saveSessionState();
+    renderLive();
+  }
+
+  function renderLive(){
+    $('tourNum').textContent = sessionRounds.length + 1;
+    const wins = sessionRounds.filter(r => r === 'win').length;
+    const losses = sessionRounds.filter(r => r === 'loss').length;
+    $('liveWinCount').textContent = wins;
+    $('liveLossCount').textContent = losses;
+    $('miniHistory').innerHTML = sessionRounds.map(r =>
+      `<div class="chip ${r}">${r === 'win' ? '✔' : '✘'}</div>`
+    ).join('');
+  }
+
+  // ---------- Session terminée ----------
+  $('btnFin').addEventListener('click', () => {
+    if(!sessionStart) return;
+    if(sessionRounds.length === 0){
+      if(!confirm('Aucun tour enregistré. Terminer quand même la session ?')) return;
+    }
+
+    const d = today();
+    let netPL = 0;
+    sessionRounds.forEach(r => {
+      entries.push({ date: d, result: r, amount: mise });
+      netPL += (r === 'win' ? mise : -mise);
+    });
+    saveEntries();
+
+    const newCapital = capitalInitial + netPL;
+    const wins = sessionRounds.filter(r => r === 'win').length;
+    const losses = sessionRounds.filter(r => r === 'loss').length;
+
+    $('bilanCapital').textContent = Math.round(newCapital) + 'f';
+    $('bilanCapital').className = 'value big ' + (newCapital >= capitalInitial ? 'pos' : 'neg');
+    $('bilanRounds').textContent = sessionRounds.length;
+    $('bilanNetPL').textContent = fmt(netPL);
+    $('bilanNetPL').className = 'value ' + (netPL >= 0 ? 'pos' : 'neg');
+    $('bilanWins').textContent = wins;
+    $('bilanLosses').textContent = losses;
+
+    stopTimer();
+    sessionStart = null;
+    sessionRounds = [];
+    saveSessionState();
+
+    $('liveCard').classList.add('hidden');
+    $('expiredBanner').style.display = 'none';
+    $('bilanCard').classList.remove('hidden');
+
+    renderAll();
+
+    // Pré-remplit le prochain capital avec le nouveau solde
+    $('capitalInput').value = Math.round(newCapital);
+  });
+
+  $('newSessionBtn').addEventListener('click', () => {
+    $('bilanCard').classList.add('hidden');
+    $('mainScreen').classList.add('hidden');
+    $('configCard').classList.remove('hidden');
+    initConfigScreen(parseFloat($('capitalInput').value));
+  });
+
+  // ---------- Suppression / reset historique ----------
+  $('clearAllBtn').addEventListener('click', () => {
+    if(!confirm('Effacer tout l\'historique ? Cette action est irréversible.')) return;
+    entries = [];
+    saveEntries();
+    renderAll();
+  });
+  function deleteEntry(index){
+    entries.splice(index, 1);
+    saveEntries();
+    renderAll();
+  }
+
+  // ---------- Rendu global (stats / analyse / historique) ----------
+  function renderAll(){
+    $('capitalBadge').textContent = Math.round(capitalInitial) + 'f';
+
+    const total = entries.length;
+    const wins = entries.filter(e => e.result === 'win');
+    const losses = entries.filter(e => e.result === 'loss');
+    const netPL = entries.reduce((sum,e) => sum + (e.result === 'win' ? e.amount : -e.amount), 0);
+
+    $('statSessions').textContent = total;
+    $('statWins').textContent = wins.length;
+    $('statLosses').textContent = losses.length;
+    $('statNetPL').textContent = fmt(netPL);
+    $('statNetPL').className = 'value ' + (netPL >= 0 ? 'green' : 'red');
+
+    const winRate = total > 0 ? (wins.length/total*100) : 0;
+    $('anWinRate').textContent = winRate.toFixed(1) + '%';
+
+    const roi = capitalInitial > 0 ? (netPL/capitalInitial*100) : 0;
+    $('anROI').textContent = (roi >= 0 ? '+' : '') + roi.toFixed(1) + '%';
+    $('anROI').className = 'value ' + (roi < 0 ? 'neg' : '');
+
+    const gainMoy = wins.length > 0 ? (wins.reduce((s,e)=>s+e.amount,0)/wins.length) : null;
+    const perteMoy = losses.length > 0 ? (losses.reduce((s,e)=>s+e.amount,0)/losses.length) : null;
+    $('anGainMoy').textContent = gainMoy !== null ? ('+' + Math.round(gainMoy) + 'f') : '—';
+    $('anPerteMoy').textContent = perteMoy !== null ? ('-' + Math.round(perteMoy) + 'f') : '—';
+    $('anPerteMoy').className = 'value ' + (perteMoy !== null ? 'red' : 'neg');
+
+    let bestWinStreak = 0, worstLossStreak = 0, curWin = 0, curLoss = 0;
+    entries.forEach(e => {
+      if(e.result === 'win'){ curWin++; curLoss = 0; if(curWin > bestWinStreak) bestWinStreak = curWin; }
+      else { curLoss++; curWin = 0; if(curLoss > worstLossStreak) worstLossStreak = curLoss; }
+    });
+    $('anBestStreak').textContent = bestWinStreak + ' W';
+    $('anWorstStreak').textContent = worstLossStreak + ' L';
+
+    let currentStreak = 0, currentType = null;
+    for(let i = entries.length - 1; i >= 0; i--){
+      if(currentType === null){ currentType = entries[i].result; currentStreak = 1; }
+      else if(entries[i].result === currentType){ currentStreak++; }
+      else break;
+    }
+    const streakLabel = currentType === 'win' ? (currentStreak + ' W') : (currentType === 'loss' ? (currentStreak + ' L') : '0');
+    $('anCurrentStreak').textContent = streakLabel;
+    $('anCurrentStreak').className = 'value ' + (currentType === 'win' ? 'green' : (currentType === 'loss' ? 'red' : ''));
+
+    const threshold = 20;
+    $('sampleText').textContent = total + '/' + threshold + ' sessions minimum. Continue à logger — le verdict sera fiable à partir de ' + threshold + ' sessions.';
+    $('sampleWarning').style.display = total >= threshold ? 'none' : 'block';
+
+    renderHistory();
+    renderChart();
+  }
+
+  function renderChart(){
+    const labels = ['T0'];
+    const data = [0];
+    let running = 0;
+    entries.forEach((e, i) => {
+      running += (e.result === 'win' ? e.amount : -e.amount);
+      labels.push('T' + (i+1));
+      data.push(running);
+    });
+
+    const canvasEl = $('capitalChart');
+    if(!canvasEl || typeof Chart === 'undefined') return;
+
+    if(capitalChart){
+      capitalChart.data.labels = labels;
+      capitalChart.data.datasets[0].data = data;
+      capitalChart.update();
+      return;
+    }
+
+    capitalChart = new Chart(canvasEl.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Net P&L cumulé',
+          data: data,
+          borderColor: '#ffcf5c',
+          backgroundColor: 'rgba(255,207,92,0.12)',
+          borderWidth: 2,
+          pointRadius: entries.length > 40 ? 0 : 3,
+          pointBackgroundColor: '#ffcf5c',
+          tension: 0.25,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#9c8fc9', maxTicksLimit: 8 }, grid: { color: 'rgba(140,110,255,0.1)' } },
+          y: { ticks: { color: '#9c8fc9' }, grid: { color: 'rgba(140,110,255,0.1)' } }
+        }
+      }
+    });
+  }
+
+  function renderHistory(){
+    const list = $('histList');
+    const empty = $('histEmpty');
+    if(entries.length === 0){
+      list.innerHTML = '';
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    list.innerHTML = entries.map((e, idx) => {
+      const displayDate = e.date.split('-').reverse().join('/');
+      const amountText = (e.result === 'win' ? '+' : '-') + Math.round(e.amount) + 'f';
+      return `<div class="hist-item">
+        <div class="hist-left">
+          <div class="dot-status ${e.result}"></div>
+          <div class="hist-date">${displayDate}</div>
+        </div>
+        <div class="hist-right">
+          <div class="hist-amount ${e.result}">${amountText}</div>
+          <button class="del-btn" data-idx="${idx}" title="Supprimer">✕</button>
+        </div>
+      </div>`;
+    }).reverse().join('');
+
+    list.querySelectorAll('.del-btn').forEach(btn => {
+      btn.addEventListener('click', () => deleteEntry(parseInt(btn.dataset.idx)));
+    });
+  }
+
+  // ---------- Init ----------
+  entries = loadEntries();
+  const savedCapital = loadCapital();
+  initConfigScreen();
+
+  const savedStart = parseInt(localStorage.getItem(STORAGE_SESSION_START));
+  if(savedCapital && !isNaN(savedStart)){
+    // Reprise d'une session en cours après reload
+    capitalInitial = savedCapital;
+    mise = capitalInitial * 0.07;
+    sessionStart = savedStart;
+    try{ sessionRounds = JSON.parse(localStorage.getItem(STORAGE_SESSION_ROUNDS)) || []; }
+    catch(e){ sessionRounds = []; }
+
+    $('configCard').classList.add('hidden');
+    $('bilanCard').classList.add('hidden');
+    $('liveCard').classList.remove('hidden');
+    $('mainScreen').classList.remove('hidden');
+
+    renderLive();
+    renderAll();
+    startTimer();
+    const elapsed = Date.now() - sessionStart;
+    if(elapsed >= SESSION_MAX_MS){
+      expiredNotified = true;
+      $('expiredBanner').style.display = 'block';
+      setRoundButtonsEnabled(false);
+    }
+  } else if(savedCapital && entries.length > 0){
+    // Pas de session active mais historique existant : montrer le dashboard prêt à démarrer
+    capitalInitial = savedCapital;
+    initConfigScreen(savedCapital);
+  }
+})();
+</script>
+
+</body>
+</html>
