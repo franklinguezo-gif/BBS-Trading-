@@ -866,12 +866,29 @@ function computeDailyRecommendation(rangeeId, intervalId, cote){
 
   const analysis = analyzeMarkets(bucketEntries);
   const top = analysis.ranked[0] || null;
+  const second = analysis.ranked[1] || null;
+  const margin = top ? (top.pct - (second ? second.pct : 0)) : 0;
+
+  // Vérifie la dégradation récente au niveau de l'intervalle entier (même logique que le Constat),
+  // et disqualifie le badge Diamant si le marché recommandé est justement celui qui se dégrade.
+  const allCompleted = iv.entries.filter(hasFT);
+  let recentFlag = false;
+  if (top && allCompleted.length >= 10){
+    const recentEntries = allCompleted.slice(-10);
+    const recentAnalysis = analyzeMarkets(recentEntries);
+    const recentMatch = recentAnalysis.ranked.find(m => m.label === top.label);
+    if (recentMatch && (top.pct - recentMatch.pct) >= 15) recentFlag = true;
+  }
+
+  const elite = !!(top && top.total >= 15 && top.pct >= 85 && margin >= 10 && !recentFlag);
+
   return {
     rangeeLabel: r.label,
     intervalLabel: iv.label,
     range: `${floor.toFixed(2)}–${high.toFixed(2)}`,
     top,
-    n: bucketEntries.length
+    n: bucketEntries.length,
+    elite
   };
 }
 
@@ -998,6 +1015,31 @@ function renderDailyPicks(){
     if (topPicks.length >= 15) break;
   }
 
+  // Filtre Diamant : sélection ultra-stricte parmi les picks déjà fiables (n>=15, %>=85,
+  // écart net avec le 2e marché, pas de dégradation récente). Dédoublonné pareil.
+  const elitePicks = topPicks.filter(c => c.rec.elite);
+
+  const eliteBlock = elitePicks.length === 0 ? '' : `
+    <div class="featured-panel" style="margin-bottom:14px;border-color:var(--select);background:linear-gradient(135deg, rgba(91,141,238,0.08), transparent);">
+      <h2 style="color:var(--select);border-bottom-color:rgba(91,141,238,0.2);">💎 Filtre Diamant — ${elitePicks.length} sélection(s) ultra-strictes</h2>
+      <table>
+        <thead><tr><th>#</th><th>Match</th><th>Rangée/Intervalle</th><th>Option</th><th>%</th></tr></thead>
+        <tbody>
+          ${elitePicks.map((c, i) => `
+            <tr>
+              <td>${i+1}</td>
+              <td>${c.pick.label}</td>
+              <td>${c.rec.rangeeLabel} / ${c.rec.intervalLabel}</td>
+              <td>${c.rec.top.label}</td>
+              <td><span class="tag" style="background:var(--select-soft);color:var(--select);">${c.rec.top.pct}%</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <div class="footnote">Critères : 15+ données, 85%+ de réussite, écart net avec le 2e marché (≥10 pts), aucune dégradation récente détectée. Aucun filtre ne garantit un résultat — ceci reste une lecture statistique, pas une certitude.</div>
+    </div>
+  `;
+
   const topBlock = topPicks.length === 0 ? '' : `
     <div class="featured-panel" style="margin-bottom:14px;">
       <h2>🏆 Top ${topPicks.length} du jour — fiable (doublons de signal filtrés)</h2>
@@ -1009,7 +1051,7 @@ function renderDailyPicks(){
               <td>${i+1}</td>
               <td>${c.pick.label}</td>
               <td>${c.rec.rangeeLabel} / ${c.rec.intervalLabel}</td>
-              <td>${c.rec.top.label}</td>
+              <td>${c.rec.top.label}${c.rec.elite ? ' 💎' : ''}</td>
               <td><span class="tag hit">${c.rec.top.pct}%</span></td>
             </tr>
           `).join('')}
@@ -1020,6 +1062,7 @@ function renderDailyPicks(){
   `;
 
   el.innerHTML = `
+    ${eliteBlock}
     ${topBlock}
     <div style="overflow-x:auto;">
       <table style="margin-top:10px;">
