@@ -453,42 +453,16 @@ async function deleteSelected(rangeeId, ivId){
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 
-// Liste complète des marchés analysés — tout ce qui est calculable à partir des scores HT/FT seuls.
-// Chaque test reçoit un contexte {ftHome, ftAway, htHome, htAway, ftTotal, htTotal, hasFt, hasHt}
-// et renvoie true/false, ou null si la donnée nécessaire (FT ou HT) n'est pas disponible pour ce match.
-const ALL_MARKETS = [
-  // FT — seuils de buts
-  { key:'ft_o05', label:'FT +0.5', test:c => c.hasFt ? c.ftTotal>=1 : null },
-  { key:'ft_u05', label:'FT -0.5', test:c => c.hasFt ? c.ftTotal<=0 : null },
-  { key:'ft_o15', label:'FT +1.5', test:c => c.hasFt ? c.ftTotal>=2 : null },
-  { key:'ft_u15', label:'FT -1.5', test:c => c.hasFt ? c.ftTotal<=1 : null },
-  { key:'ft_o25', label:'FT +2.5', test:c => c.hasFt ? c.ftTotal>=3 : null },
-  { key:'ft_u25', label:'FT -2.5', test:c => c.hasFt ? c.ftTotal<=2 : null },
-  { key:'ft_o35', label:'FT +3.5', test:c => c.hasFt ? c.ftTotal>=4 : null },
-  { key:'ft_u35', label:'FT -3.5', test:c => c.hasFt ? c.ftTotal<=3 : null },
-  { key:'ft_o45', label:'FT +4.5', test:c => c.hasFt ? c.ftTotal>=5 : null },
-  { key:'ft_u45', label:'FT -4.5', test:c => c.hasFt ? c.ftTotal<=4 : null },
-  // FT — résultat / double chance
-  { key:'ft_12', label:'FT 12 (pas de nul)', test:c => c.hasFt ? c.ftHome!==c.ftAway : null },
-  { key:'ft_1x', label:'FT 1X (dom. ou nul)', test:c => c.hasFt ? c.ftHome>=c.ftAway : null },
-  { key:'ft_x2', label:'FT X2 (nul ou ext.)', test:c => c.hasFt ? c.ftHome<=c.ftAway : null },
-  // FT — parité, BTTS, cage inviolée, victoire à 0
-  { key:'ft_pair', label:'FT Total pair', test:c => c.hasFt ? c.ftTotal%2===0 : null },
-  { key:'ft_impair', label:'FT Total impair', test:c => c.hasFt ? c.ftTotal%2===1 : null },
-  { key:'btts_yes', label:'BTTS Oui', test:c => c.hasFt ? (c.ftHome>0 && c.ftAway>0) : null },
-  { key:'btts_no', label:'BTTS Non', test:c => c.hasFt ? !(c.ftHome>0 && c.ftAway>0) : null },
-  { key:'home_cs', label:'Dom. cage inviolée', test:c => c.hasFt ? c.ftAway===0 : null },
-  { key:'away_cs', label:'Ext. cage inviolée', test:c => c.hasFt ? c.ftHome===0 : null },
-  { key:'home_wtn', label:'Dom. gagne à 0', test:c => c.hasFt ? (c.ftHome>c.ftAway && c.ftAway===0) : null },
-  { key:'away_wtn', label:'Ext. gagne à 0', test:c => c.hasFt ? (c.ftAway>c.ftHome && c.ftHome===0) : null },
-  // HT
-  { key:'ht_o05', label:'HT +0.5', test:c => c.hasHt ? c.htTotal>=1 : null },
-  { key:'ht_u05', label:'HT -0.5', test:c => c.hasHt ? c.htTotal<=0 : null },
-  { key:'ht_o15', label:'HT +1.5', test:c => c.hasHt ? c.htTotal>=2 : null },
-  { key:'ht_u15', label:'HT -1.5', test:c => c.hasHt ? c.htTotal<=1 : null },
-  { key:'ht_u25', label:'HT -2.5', test:c => c.hasHt ? c.htTotal<=2 : null },
-  { key:'ht_12', label:'HT 12 (pas de nul)', test:c => c.hasHt ? c.htHome!==c.htAway : null },
-  { key:'ht_btts', label:'HT BTTS Oui', test:c => c.hasHt ? (c.htHome>0 && c.htAway>0) : null },
+const MARKET_DEFS = [
+  { key:'ft_o15', label:'FT +1.5', scope:'ft', test:(v)=> v>=2 },
+  { key:'ft_u15', label:'FT -1.5', scope:'ft', test:(v)=> v<=1 },
+  { key:'ft_o25', label:'FT +2.5', scope:'ft', test:(v)=> v>=3 },
+  { key:'ft_u25', label:'FT -2.5', scope:'ft', test:(v)=> v<=2 },
+  { key:'ft_o35', label:'FT +3.5', scope:'ft', test:(v)=> v>=4 },
+  { key:'ft_u35', label:'FT -3.5', scope:'ft', test:(v)=> v<=3 },
+  { key:'ht_o15', label:'HT +1.5', scope:'ht', test:(v)=> v>=2 },
+  { key:'ht_u15', label:'HT -1.5', scope:'ht', test:(v)=> v<=1 },
+  { key:'ht_u25', label:'HT -2.5', scope:'ht', test:(v)=> v<=2 },
 ];
 
 function confidenceTag(n){
@@ -500,43 +474,43 @@ function confidenceTag(n){
 function hasFT(e){ return e.ftHome !== '' && e.ftAway !== '' && e.ftHome != null && e.ftAway != null; }
 function hasHT(e){ return e.htHome !== '' && e.htAway !== '' && e.htHome != null && e.htAway != null; }
 
-function buildMarketContext(e){
-  const hasFt = hasFT(e);
-  const hasHt = hasHT(e);
-  const ftHome = hasFt ? parseInt(e.ftHome) : null;
-  const ftAway = hasFt ? parseInt(e.ftAway) : null;
-  const htHome = hasHt ? parseInt(e.htHome) : null;
-  const htAway = hasHt ? parseInt(e.htAway) : null;
-  return {
-    hasFt, hasHt, ftHome, ftAway, htHome, htAway,
-    ftTotal: hasFt ? ftHome + ftAway : null,
-    htTotal: hasHt ? htHome + htAway : null
-  };
-}
-
 function analyzeMarkets(entries){
   const counts = {};
-  ALL_MARKETS.forEach(m => counts[m.key] = { hit:0, total:0, label:m.label });
+  MARKET_DEFS.forEach(m => counts[m.key] = { hit:0, total:0, label:m.label });
+  counts['ft_12'] = { hit:0, total:0, label:'FT 12 (pas de nul)' };
+  counts['btts_yes'] = { hit:0, total:0, label:'BTTS Oui' };
+  counts['btts_no'] = { hit:0, total:0, label:'BTTS Non' };
   const oneXtwo = { '1':0, 'X':0, '2':0, total:0 };
 
   entries.forEach(e => {
-    const ctx = buildMarketContext(e);
+    const ftTotal = hasFT(e) ? parseInt(e.ftHome) + parseInt(e.ftAway) : null;
+    const htTotal = hasHT(e) ? parseInt(e.htHome) + parseInt(e.htAway) : null;
 
-    ALL_MARKETS.forEach(m => {
-      const result = m.test(ctx);
-      if (result === null || result === undefined) return;
+    MARKET_DEFS.forEach(m => {
+      const val = m.scope === 'ft' ? ftTotal : htTotal;
+      if (val === null) return;
       counts[m.key].total++;
-      if (result) counts[m.key].hit++;
+      if (m.test(val)) counts[m.key].hit++;
     });
 
-    if (ctx.hasFt){
-      const w = ctx.ftHome > ctx.ftAway ? '1' : (ctx.ftHome < ctx.ftAway ? '2' : 'X');
+    if (hasFT(e)){
+      const h = parseInt(e.ftHome), a = parseInt(e.ftAway);
+      const w = h > a ? '1' : (h < a ? '2' : 'X');
       oneXtwo[w]++;
       oneXtwo.total++;
+
+      counts['ft_12'].total++;
+      if (w !== 'X') counts['ft_12'].hit++;
+
+      const btts = h > 0 && a > 0;
+      counts['btts_yes'].total++;
+      if (btts) counts['btts_yes'].hit++;
+      counts['btts_no'].total++;
+      if (!btts) counts['btts_no'].hit++;
     }
   });
 
-  const ranked = ALL_MARKETS
+  const ranked = [...MARKET_DEFS, { key:'ft_12', label:'FT 12 (pas de nul)' }, { key:'btts_yes', label:'BTTS Oui' }, { key:'btts_no', label:'BTTS Non' }]
     .map(m => ({ label: m.label, ...counts[m.key], pct: counts[m.key].total ? Math.round((counts[m.key].hit/counts[m.key].total)*100) : 0 }))
     .filter(m => m.total > 0)
     .sort((a,b) => b.pct - a.pct);
@@ -760,10 +734,29 @@ function savePerformanceLog(){
 }
 
 function testMarketByLabel(label, scores){
-  const def = ALL_MARKETS.find(m => m.label === label);
-  if (!def) return null;
-  const ctx = buildMarketContext(scores);
-  return def.test(ctx);
+  const hasFt = scores.ftHome !== '' && scores.ftAway !== '';
+  const hasHt = scores.htHome !== '' && scores.htAway !== '';
+  const ftTotal = hasFt ? parseInt(scores.ftHome) + parseInt(scores.ftAway) : null;
+  const htTotal = hasHt ? parseInt(scores.htHome) + parseInt(scores.htAway) : null;
+
+  const def = MARKET_DEFS.find(m => m.label === label);
+  if (def){
+    const val = def.scope === 'ft' ? ftTotal : htTotal;
+    return val === null ? null : def.test(val);
+  }
+  if (label === 'FT 12 (pas de nul)'){
+    if (!hasFt) return null;
+    return parseInt(scores.ftHome) !== parseInt(scores.ftAway);
+  }
+  if (label === 'BTTS Oui'){
+    if (!hasFt) return null;
+    return parseInt(scores.ftHome) > 0 && parseInt(scores.ftAway) > 0;
+  }
+  if (label === 'BTTS Non'){
+    if (!hasFt) return null;
+    return !(parseInt(scores.ftHome) > 0 && parseInt(scores.ftAway) > 0);
+  }
+  return null;
 }
 
 function logPerformance(pick, rec, scores){
