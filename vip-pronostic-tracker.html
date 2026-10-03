@@ -340,6 +340,32 @@
   </div>
 
   <div class="panel">
+    <h2>🧮 Simulateur de coupon — comparer plusieurs combinaisons avant de jouer</h2>
+    <div class="new-interval-row">
+      <div>
+        <label>Rangée</label>
+        <select id="cp-rangee" class="w-md" onchange="populateCouponIntervalOptions()"></select>
+      </div>
+      <div>
+        <label>Intervalle</label>
+        <select id="cp-interval" class="w-md" onchange="populateCouponMarketOptions()"></select>
+      </div>
+      <div>
+        <label>Marché</label>
+        <select id="cp-market" class="w-md"></select>
+      </div>
+      <div>
+        <label>Cote réelle (bookmaker)</label>
+        <input type="number" step="0.01" class="w-sm" id="cp-cote" placeholder="1.30">
+      </div>
+      <button onclick="addCouponLeg()">+ Ajouter au coupon</button>
+      <button class="ghost" onclick="clearCoupon()">Vider le coupon</button>
+    </div>
+    <div id="coupon-results"></div>
+    <div class="footnote">Calcul à la demande, ne modifie ni ne lit tes données déjà saisies pour les stats — sert uniquement à comparer des scénarios avant de jouer.</div>
+  </div>
+
+  <div class="panel">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
       <h2 style="margin:0;">📊 Tracker de performance — indépendant de l'historique</h2>
       <button class="ghost danger small" onclick="clearPerformanceLog()">Vider le suivi</button>
@@ -453,16 +479,42 @@ async function deleteSelected(rangeeId, ivId){
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 
-const MARKET_DEFS = [
-  { key:'ft_o15', label:'FT +1.5', scope:'ft', test:(v)=> v>=2 },
-  { key:'ft_u15', label:'FT -1.5', scope:'ft', test:(v)=> v<=1 },
-  { key:'ft_o25', label:'FT +2.5', scope:'ft', test:(v)=> v>=3 },
-  { key:'ft_u25', label:'FT -2.5', scope:'ft', test:(v)=> v<=2 },
-  { key:'ft_o35', label:'FT +3.5', scope:'ft', test:(v)=> v>=4 },
-  { key:'ft_u35', label:'FT -3.5', scope:'ft', test:(v)=> v<=3 },
-  { key:'ht_o15', label:'HT +1.5', scope:'ht', test:(v)=> v>=2 },
-  { key:'ht_u15', label:'HT -1.5', scope:'ht', test:(v)=> v<=1 },
-  { key:'ht_u25', label:'HT -2.5', scope:'ht', test:(v)=> v<=2 },
+// Liste complète des marchés analysés — tout ce qui est calculable à partir des scores HT/FT seuls.
+// Chaque test reçoit un contexte {ftHome, ftAway, htHome, htAway, ftTotal, htTotal, hasFt, hasHt}
+// et renvoie true/false, ou null si la donnée nécessaire (FT ou HT) n'est pas disponible pour ce match.
+const ALL_MARKETS = [
+  // FT — seuils de buts
+  { key:'ft_o05', label:'FT +0.5', test:c => c.hasFt ? c.ftTotal>=1 : null },
+  { key:'ft_u05', label:'FT -0.5', test:c => c.hasFt ? c.ftTotal<=0 : null },
+  { key:'ft_o15', label:'FT +1.5', test:c => c.hasFt ? c.ftTotal>=2 : null },
+  { key:'ft_u15', label:'FT -1.5', test:c => c.hasFt ? c.ftTotal<=1 : null },
+  { key:'ft_o25', label:'FT +2.5', test:c => c.hasFt ? c.ftTotal>=3 : null },
+  { key:'ft_u25', label:'FT -2.5', test:c => c.hasFt ? c.ftTotal<=2 : null },
+  { key:'ft_o35', label:'FT +3.5', test:c => c.hasFt ? c.ftTotal>=4 : null },
+  { key:'ft_u35', label:'FT -3.5', test:c => c.hasFt ? c.ftTotal<=3 : null },
+  { key:'ft_o45', label:'FT +4.5', test:c => c.hasFt ? c.ftTotal>=5 : null },
+  { key:'ft_u45', label:'FT -4.5', test:c => c.hasFt ? c.ftTotal<=4 : null },
+  // FT — résultat / double chance
+  { key:'ft_12', label:'FT 12 (pas de nul)', test:c => c.hasFt ? c.ftHome!==c.ftAway : null },
+  { key:'ft_1x', label:'FT 1X (dom. ou nul)', test:c => c.hasFt ? c.ftHome>=c.ftAway : null },
+  { key:'ft_x2', label:'FT X2 (nul ou ext.)', test:c => c.hasFt ? c.ftHome<=c.ftAway : null },
+  // FT — parité, BTTS, cage inviolée, victoire à 0
+  { key:'ft_pair', label:'FT Total pair', test:c => c.hasFt ? c.ftTotal%2===0 : null },
+  { key:'ft_impair', label:'FT Total impair', test:c => c.hasFt ? c.ftTotal%2===1 : null },
+  { key:'btts_yes', label:'BTTS Oui', test:c => c.hasFt ? (c.ftHome>0 && c.ftAway>0) : null },
+  { key:'btts_no', label:'BTTS Non', test:c => c.hasFt ? !(c.ftHome>0 && c.ftAway>0) : null },
+  { key:'home_cs', label:'Dom. cage inviolée', test:c => c.hasFt ? c.ftAway===0 : null },
+  { key:'away_cs', label:'Ext. cage inviolée', test:c => c.hasFt ? c.ftHome===0 : null },
+  { key:'home_wtn', label:'Dom. gagne à 0', test:c => c.hasFt ? (c.ftHome>c.ftAway && c.ftAway===0) : null },
+  { key:'away_wtn', label:'Ext. gagne à 0', test:c => c.hasFt ? (c.ftAway>c.ftHome && c.ftHome===0) : null },
+  // HT
+  { key:'ht_o05', label:'HT +0.5', test:c => c.hasHt ? c.htTotal>=1 : null },
+  { key:'ht_u05', label:'HT -0.5', test:c => c.hasHt ? c.htTotal<=0 : null },
+  { key:'ht_o15', label:'HT +1.5', test:c => c.hasHt ? c.htTotal>=2 : null },
+  { key:'ht_u15', label:'HT -1.5', test:c => c.hasHt ? c.htTotal<=1 : null },
+  { key:'ht_u25', label:'HT -2.5', test:c => c.hasHt ? c.htTotal<=2 : null },
+  { key:'ht_12', label:'HT 12 (pas de nul)', test:c => c.hasHt ? c.htHome!==c.htAway : null },
+  { key:'ht_btts', label:'HT BTTS Oui', test:c => c.hasHt ? (c.htHome>0 && c.htAway>0) : null },
 ];
 
 function confidenceTag(n){
@@ -474,43 +526,43 @@ function confidenceTag(n){
 function hasFT(e){ return e.ftHome !== '' && e.ftAway !== '' && e.ftHome != null && e.ftAway != null; }
 function hasHT(e){ return e.htHome !== '' && e.htAway !== '' && e.htHome != null && e.htAway != null; }
 
+function buildMarketContext(e){
+  const hasFt = hasFT(e);
+  const hasHt = hasHT(e);
+  const ftHome = hasFt ? parseInt(e.ftHome) : null;
+  const ftAway = hasFt ? parseInt(e.ftAway) : null;
+  const htHome = hasHt ? parseInt(e.htHome) : null;
+  const htAway = hasHt ? parseInt(e.htAway) : null;
+  return {
+    hasFt, hasHt, ftHome, ftAway, htHome, htAway,
+    ftTotal: hasFt ? ftHome + ftAway : null,
+    htTotal: hasHt ? htHome + htAway : null
+  };
+}
+
 function analyzeMarkets(entries){
   const counts = {};
-  MARKET_DEFS.forEach(m => counts[m.key] = { hit:0, total:0, label:m.label });
-  counts['ft_12'] = { hit:0, total:0, label:'FT 12 (pas de nul)' };
-  counts['btts_yes'] = { hit:0, total:0, label:'BTTS Oui' };
-  counts['btts_no'] = { hit:0, total:0, label:'BTTS Non' };
+  ALL_MARKETS.forEach(m => counts[m.key] = { hit:0, total:0, label:m.label });
   const oneXtwo = { '1':0, 'X':0, '2':0, total:0 };
 
   entries.forEach(e => {
-    const ftTotal = hasFT(e) ? parseInt(e.ftHome) + parseInt(e.ftAway) : null;
-    const htTotal = hasHT(e) ? parseInt(e.htHome) + parseInt(e.htAway) : null;
+    const ctx = buildMarketContext(e);
 
-    MARKET_DEFS.forEach(m => {
-      const val = m.scope === 'ft' ? ftTotal : htTotal;
-      if (val === null) return;
+    ALL_MARKETS.forEach(m => {
+      const result = m.test(ctx);
+      if (result === null || result === undefined) return;
       counts[m.key].total++;
-      if (m.test(val)) counts[m.key].hit++;
+      if (result) counts[m.key].hit++;
     });
 
-    if (hasFT(e)){
-      const h = parseInt(e.ftHome), a = parseInt(e.ftAway);
-      const w = h > a ? '1' : (h < a ? '2' : 'X');
+    if (ctx.hasFt){
+      const w = ctx.ftHome > ctx.ftAway ? '1' : (ctx.ftHome < ctx.ftAway ? '2' : 'X');
       oneXtwo[w]++;
       oneXtwo.total++;
-
-      counts['ft_12'].total++;
-      if (w !== 'X') counts['ft_12'].hit++;
-
-      const btts = h > 0 && a > 0;
-      counts['btts_yes'].total++;
-      if (btts) counts['btts_yes'].hit++;
-      counts['btts_no'].total++;
-      if (!btts) counts['btts_no'].hit++;
     }
   });
 
-  const ranked = [...MARKET_DEFS, { key:'ft_12', label:'FT 12 (pas de nul)' }, { key:'btts_yes', label:'BTTS Oui' }, { key:'btts_no', label:'BTTS Non' }]
+  const ranked = ALL_MARKETS
     .map(m => ({ label: m.label, ...counts[m.key], pct: counts[m.key].total ? Math.round((counts[m.key].hit/counts[m.key].total)*100) : 0 }))
     .filter(m => m.total > 0)
     .sort((a,b) => b.pct - a.pct);
@@ -700,8 +752,8 @@ async function importJSONFile(event){
 function exportCSV(){
   const flat = allEntriesFlat();
   if (flat.length === 0) return;
-  const header = ['rangee','intervalle','cote','ht_dom','ht_ext','ft_dom','ft_ext'];
-  const rows = flat.map(e => [e.rangeeLabel, e.intervalLabel, e.cote, e.htHome, e.htAway, e.ftHome, e.ftAway].join(','));
+  const header = ['rangee','intervalle','cote','ht_dom','ht_ext','ft_dom','ft_ext','pays'];
+  const rows = flat.map(e => [e.rangeeLabel, e.intervalLabel, e.cote, e.htHome, e.htAway, e.ftHome, e.ftAway, e.pays || ''].join(','));
   const csv = [header.join(','), ...rows].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
@@ -734,29 +786,10 @@ function savePerformanceLog(){
 }
 
 function testMarketByLabel(label, scores){
-  const hasFt = scores.ftHome !== '' && scores.ftAway !== '';
-  const hasHt = scores.htHome !== '' && scores.htAway !== '';
-  const ftTotal = hasFt ? parseInt(scores.ftHome) + parseInt(scores.ftAway) : null;
-  const htTotal = hasHt ? parseInt(scores.htHome) + parseInt(scores.htAway) : null;
-
-  const def = MARKET_DEFS.find(m => m.label === label);
-  if (def){
-    const val = def.scope === 'ft' ? ftTotal : htTotal;
-    return val === null ? null : def.test(val);
-  }
-  if (label === 'FT 12 (pas de nul)'){
-    if (!hasFt) return null;
-    return parseInt(scores.ftHome) !== parseInt(scores.ftAway);
-  }
-  if (label === 'BTTS Oui'){
-    if (!hasFt) return null;
-    return parseInt(scores.ftHome) > 0 && parseInt(scores.ftAway) > 0;
-  }
-  if (label === 'BTTS Non'){
-    if (!hasFt) return null;
-    return !(parseInt(scores.ftHome) > 0 && parseInt(scores.ftAway) > 0);
-  }
-  return null;
+  const def = ALL_MARKETS.find(m => m.label === label);
+  if (!def) return null;
+  const ctx = buildMarketContext(scores);
+  return def.test(ctx);
 }
 
 function logPerformance(pick, rec, scores){
@@ -894,6 +927,138 @@ function populateDailyIntervalOptions(){
     return;
   }
   sel.innerHTML = r.intervals.map(iv => `<option value="${iv.id}">${iv.label}</option>`).join('');
+}
+
+// ===== Simulateur de coupon — module éphémère, ne lit/écrit jamais les données de collecte =====
+let couponLegs = []; // [{ id, rangeeId, rangeeLabel, intervalId, intervalLabel, marketLabel, pct, n, cote }]
+
+function populateCouponRangeeOptions(){
+  const sel = document.getElementById('cp-rangee');
+  if (!sel) return;
+  sel.innerHTML = FIXED_RANGEES.map(fr => `<option value="${fr.id}">${fr.label}</option>`).join('');
+  populateCouponIntervalOptions();
+}
+
+function populateCouponIntervalOptions(){
+  const rangeeId = document.getElementById('cp-rangee').value;
+  const r = rangees.find(x => x.id === rangeeId);
+  const sel = document.getElementById('cp-interval');
+  if (!r || r.intervals.length === 0){
+    sel.innerHTML = `<option value="">Aucun intervalle créé</option>`;
+    populateCouponMarketOptions();
+    return;
+  }
+  sel.innerHTML = r.intervals.map(iv => `<option value="${iv.id}">${iv.label}</option>`).join('');
+  populateCouponMarketOptions();
+}
+
+function populateCouponMarketOptions(){
+  const rangeeId = document.getElementById('cp-rangee').value;
+  const intervalId = document.getElementById('cp-interval').value;
+  const sel = document.getElementById('cp-market');
+  const r = rangees.find(x => x.id === rangeeId);
+  const iv = r ? r.intervals.find(x => x.id === intervalId) : null;
+  if (!iv){
+    sel.innerHTML = `<option value="">—</option>`;
+    return;
+  }
+  const analysis = analyzeMarkets(iv.entries);
+  if (analysis.ranked.length === 0){
+    sel.innerHTML = `<option value="">Aucune donnée dans cet intervalle</option>`;
+    return;
+  }
+  sel.innerHTML = analysis.ranked.map(m => `<option value="${m.label}">${m.label} — ${m.pct}% (${m.hit}/${m.total})</option>`).join('');
+}
+
+function addCouponLeg(){
+  const rangeeId = document.getElementById('cp-rangee').value;
+  const intervalId = document.getElementById('cp-interval').value;
+  const marketLabel = document.getElementById('cp-market').value;
+  const cote = document.getElementById('cp-cote').value;
+
+  if (!rangeeId || !intervalId || !marketLabel || cote === ''){
+    alert('Sélectionne une rangée, un intervalle, un marché, et rentre la cote réelle du bookmaker.');
+    return;
+  }
+
+  const r = rangees.find(x => x.id === rangeeId);
+  const iv = r.intervals.find(x => x.id === intervalId);
+  const analysis = analyzeMarkets(iv.entries);
+  const marketData = analysis.ranked.find(m => m.label === marketLabel);
+  if (!marketData) return;
+
+  couponLegs.push({
+    id: uid(),
+    rangeeLabel: r.label,
+    intervalLabel: iv.label,
+    marketLabel,
+    pct: marketData.pct,
+    n: marketData.total,
+    cote: parseFloat(cote)
+  });
+
+  document.getElementById('cp-cote').value = '';
+  renderCouponSimulator();
+}
+
+function removeCouponLeg(id){
+  couponLegs = couponLegs.filter(l => l.id !== id);
+  renderCouponSimulator();
+}
+
+function clearCoupon(){
+  if (couponLegs.length === 0) return;
+  couponLegs = [];
+  renderCouponSimulator();
+}
+
+function renderCouponSimulator(){
+  const el = document.getElementById('coupon-results');
+  if (!el) return;
+
+  if (couponLegs.length === 0){
+    el.innerHTML = '<div class="empty">Aucune jambe ajoutée — construis ton combo ci-dessus.</div>';
+    return;
+  }
+
+  const coteTotal = couponLegs.reduce((acc, l) => acc * l.cote, 1);
+  const probaTotal = couponLegs.reduce((acc, l) => acc * (l.pct / 100), 1);
+
+  el.innerHTML = `
+    <div class="global-stats" style="margin:12px 0;">
+      <div class="stat">
+        <div class="label">Jambes</div>
+        <div class="value">${couponLegs.length}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Cote totale du coupon</div>
+        <div class="value" style="color:var(--accent);">${coteTotal.toFixed(2)}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Probabilité combinée (historique)</div>
+        <div class="value">${(probaTotal*100).toFixed(1)}%</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Rangée/Intervalle</th><th>Marché</th><th>Fiabilité</th><th>Cote</th><th></th></tr></thead>
+        <tbody>
+          ${couponLegs.map(l => {
+            const conf = confidenceTag(l.n);
+            return `
+            <tr>
+              <td>${l.rangeeLabel} / ${l.intervalLabel}</td>
+              <td>${l.marketLabel}</td>
+              <td><span class="tag ${conf.cls}">${l.pct}% (${conf.label})</span></td>
+              <td>${l.cote.toFixed(2)}</td>
+              <td><button class="ghost danger small" onclick="removeCouponLeg('${l.id}')">✕</button></td>
+            </tr>
+          `;}).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="footnote">La probabilité combinée est le produit des % historiques de chaque marché — une estimation basée sur ton historique, pas une garantie.</div>
+  `;
 }
 
 function populateExactRangeeOptions(){
@@ -1084,11 +1249,11 @@ function exportDayJournal(dateStr){
   const flat = allEntriesFlat().filter(e => e.date === dateStr);
   if (flat.length === 0) return false;
 
-  const header = ['rangee','intervalle','cote','ht_dom','ht_ext','ft_dom','ft_ext','resultat_ft_-3.5'];
+  const header = ['rangee','intervalle','cote','ht_dom','ht_ext','ft_dom','ft_ext','pays','resultat_ft_-3.5'];
   const rows = flat.map(e => {
     const total = (e.ftHome !== '' && e.ftAway !== '') ? parseInt(e.ftHome) + parseInt(e.ftAway) : null;
     const resultat = total === null ? '' : (total <= 3 ? 'Under 3.5 (gagné)' : 'Over 3.5 (perdu)');
-    return [e.rangeeLabel, e.intervalLabel, e.cote, e.htHome, e.htAway, e.ftHome, e.ftAway, resultat].join(',');
+    return [e.rangeeLabel, e.intervalLabel, e.cote, e.htHome, e.htAway, e.ftHome, e.ftAway, e.pays || '', resultat].join(',');
   });
   const csv = [header.join(','), ...rows].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -1296,6 +1461,8 @@ async function load(){
   populateDailyRangeeOptions();
   renderDailyPicks();
   populateExactRangeeOptions();
+  populateCouponRangeeOptions();
+  renderCouponSimulator();
   loadPerformanceLog();
   renderPerformanceTracker();
 }
