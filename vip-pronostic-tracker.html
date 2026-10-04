@@ -484,37 +484,22 @@ function todayStr(){ return new Date().toISOString().slice(0,10); }
 // et renvoie true/false, ou null si la donnée nécessaire (FT ou HT) n'est pas disponible pour ce match.
 const ALL_MARKETS = [
   // FT — seuils de buts
-  { key:'ft_o05', label:'FT +0.5', test:c => c.hasFt ? c.ftTotal>=1 : null },
-  { key:'ft_u05', label:'FT -0.5', test:c => c.hasFt ? c.ftTotal<=0 : null },
   { key:'ft_o15', label:'FT +1.5', test:c => c.hasFt ? c.ftTotal>=2 : null },
   { key:'ft_u15', label:'FT -1.5', test:c => c.hasFt ? c.ftTotal<=1 : null },
   { key:'ft_o25', label:'FT +2.5', test:c => c.hasFt ? c.ftTotal>=3 : null },
   { key:'ft_u25', label:'FT -2.5', test:c => c.hasFt ? c.ftTotal<=2 : null },
   { key:'ft_o35', label:'FT +3.5', test:c => c.hasFt ? c.ftTotal>=4 : null },
   { key:'ft_u35', label:'FT -3.5', test:c => c.hasFt ? c.ftTotal<=3 : null },
-  { key:'ft_o45', label:'FT +4.5', test:c => c.hasFt ? c.ftTotal>=5 : null },
   { key:'ft_u45', label:'FT -4.5', test:c => c.hasFt ? c.ftTotal<=4 : null },
-  // FT — résultat / double chance
+  // FT — résultat
   { key:'ft_12', label:'FT 12 (pas de nul)', test:c => c.hasFt ? c.ftHome!==c.ftAway : null },
-  { key:'ft_1x', label:'FT 1X (dom. ou nul)', test:c => c.hasFt ? c.ftHome>=c.ftAway : null },
-  { key:'ft_x2', label:'FT X2 (nul ou ext.)', test:c => c.hasFt ? c.ftHome<=c.ftAway : null },
-  // FT — parité, BTTS, cage inviolée, victoire à 0
-  { key:'ft_pair', label:'FT Total pair', test:c => c.hasFt ? c.ftTotal%2===0 : null },
-  { key:'ft_impair', label:'FT Total impair', test:c => c.hasFt ? c.ftTotal%2===1 : null },
+  // FT — BTTS
   { key:'btts_yes', label:'BTTS Oui', test:c => c.hasFt ? (c.ftHome>0 && c.ftAway>0) : null },
   { key:'btts_no', label:'BTTS Non', test:c => c.hasFt ? !(c.ftHome>0 && c.ftAway>0) : null },
-  { key:'home_cs', label:'Dom. cage inviolée', test:c => c.hasFt ? c.ftAway===0 : null },
-  { key:'away_cs', label:'Ext. cage inviolée', test:c => c.hasFt ? c.ftHome===0 : null },
-  { key:'home_wtn', label:'Dom. gagne à 0', test:c => c.hasFt ? (c.ftHome>c.ftAway && c.ftAway===0) : null },
-  { key:'away_wtn', label:'Ext. gagne à 0', test:c => c.hasFt ? (c.ftAway>c.ftHome && c.ftHome===0) : null },
   // HT
-  { key:'ht_o05', label:'HT +0.5', test:c => c.hasHt ? c.htTotal>=1 : null },
-  { key:'ht_u05', label:'HT -0.5', test:c => c.hasHt ? c.htTotal<=0 : null },
   { key:'ht_o15', label:'HT +1.5', test:c => c.hasHt ? c.htTotal>=2 : null },
   { key:'ht_u15', label:'HT -1.5', test:c => c.hasHt ? c.htTotal<=1 : null },
   { key:'ht_u25', label:'HT -2.5', test:c => c.hasHt ? c.htTotal<=2 : null },
-  { key:'ht_12', label:'HT 12 (pas de nul)', test:c => c.hasHt ? c.htHome!==c.htAway : null },
-  { key:'ht_btts', label:'HT BTTS Oui', test:c => c.hasHt ? (c.htHome>0 && c.htAway>0) : null },
 ];
 
 function confidenceTag(n){
