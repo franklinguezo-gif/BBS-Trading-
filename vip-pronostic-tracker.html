@@ -363,6 +363,17 @@
     </div>
     <div id="coupon-results"></div>
     <div class="footnote">Calcul à la demande, ne modifie ni ne lit tes données déjà saisies pour les stats — sert uniquement à comparer des scénarios avant de jouer.</div>
+
+    <h2 style="margin-top:18px;">🎯 Trouver la meilleure combinaison pour une cote cible</h2>
+    <div class="new-interval-row">
+      <div>
+        <label>Cote visée</label>
+        <input type="number" step="0.01" class="w-sm" id="target-cote" placeholder="1.60">
+      </div>
+      <button onclick="findBestCombo()">Chercher la meilleure combinaison</button>
+    </div>
+    <div class="footnote">Cherche parmi les jambes déjà ajoutées dans le simulateur ci-dessus (2 à 6 jambes) celle qui approche le mieux la cote visée avec la meilleure probabilité combinée. Ajoute d'abord tes options possibles au simulateur.</div>
+    <div id="optimizer-results"></div>
   </div>
 
   <div class="panel">
@@ -997,6 +1008,72 @@ function clearCoupon(){
   renderCouponSimulator();
 }
 
+// EV d'une jambe seule : (probabilité × cote) - 1. Positif = rentable sur la durée.
+function legEV(l){ return (l.pct/100) * l.cote - 1; }
+
+// Cherche, parmi les jambes du simulateur (couponLegs), la combinaison de 2 à 6 jambes
+// qui approche le mieux la cote cible avec la meilleure probabilité combinée.
+// Force brute limitée à 6 jambes max pour rester rapide dans le navigateur.
+function* combinations(arr, k, start = 0, combo = []){
+  if (combo.length === k){ yield combo.slice(); return; }
+  for (let i = start; i < arr.length; i++){
+    combo.push(arr[i]);
+    yield* combinations(arr, k, i + 1, combo);
+    combo.pop();
+  }
+}
+
+function findBestCombo(){
+  const targetVal = document.getElementById('target-cote').value;
+  const el = document.getElementById('optimizer-results');
+  if (targetVal === ''){
+    el.innerHTML = '<div class="empty">Renseigne une cote cible.</div>';
+    return;
+  }
+  const target = parseFloat(targetVal);
+  if (couponLegs.length < 2){
+    el.innerHTML = '<div class="empty">Ajoute au moins 2 jambes au simulateur ci-dessus pour lancer la recherche.</div>';
+    return;
+  }
+
+  const maxK = Math.min(6, couponLegs.length);
+  let candidates = [];
+  for (let k = 2; k <= maxK; k++){
+    for (const combo of combinations(couponLegs, k)){
+      const cote = combo.reduce((acc, l) => acc * l.cote, 1);
+      const proba = combo.reduce((acc, l) => acc * (l.pct / 100), 1);
+      const ev = proba * cote - 1;
+      const ecart = Math.abs(cote - target);
+      candidates.push({ combo, cote, proba, ev, ecart });
+    }
+  }
+
+  // Trie par proximité à la cote cible d'abord (fenêtre ±15%), puis par meilleure probabilité.
+  const window = target * 0.15;
+  const close = candidates.filter(c => c.ecart <= window);
+  const pool = close.length > 0 ? close : candidates;
+  pool.sort((a,b) => b.proba - a.proba || a.ecart - b.ecart);
+
+  const top3 = pool.slice(0, 3);
+
+  el.innerHTML = `
+    <div class="footnote" style="margin:10px 0;">${close.length > 0 ? `${close.length} combinaison(s) trouvée(s) proche(s) de ${target.toFixed(2)} (±15%)` : `Aucune combinaison proche de ${target.toFixed(2)} — voici les meilleures disponibles toutes cotes confondues`}</div>
+    ${top3.map((c, i) => `
+      <div class="panel" style="background:var(--panel3);margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <strong>#${i+1} — ${c.combo.length} jambes</strong>
+          <span>
+            <span class="tag" style="background:var(--accent-soft);color:var(--accent);">Cote ${c.cote.toFixed(2)}</span>
+            <span class="tag ${c.proba>=0.5?'hit':'miss'}">${(c.proba*100).toFixed(1)}%</span>
+            <span class="tag" style="color:${c.ev>=0?'var(--hit)':'var(--miss)'};background:transparent;">EV ${c.ev>=0?'+':''}${(c.ev*100).toFixed(1)}%</span>
+          </span>
+        </div>
+        <div class="footnote">${c.combo.map(l => `${l.rangeeLabel}/${l.intervalLabel} — ${l.marketLabel} (${l.pct}%, cote ${l.cote.toFixed(2)})`).join(' · ')}</div>
+      </div>
+    `).join('')}
+  `;
+}
+
 function renderCouponSimulator(){
   const el = document.getElementById('coupon-results');
   if (!el) return;
@@ -1008,6 +1085,13 @@ function renderCouponSimulator(){
 
   const coteTotal = couponLegs.reduce((acc, l) => acc * l.cote, 1);
   const probaTotal = couponLegs.reduce((acc, l) => acc * (l.pct / 100), 1);
+  const evTotal = probaTotal * coteTotal - 1;
+
+  // Jambe la plus faible = celle dont le retrait ferait le plus remonter la probabilité combinée,
+  // c'est-à-dire celle avec le % individuel le plus bas.
+  const weakestId = couponLegs.length > 1
+    ? couponLegs.reduce((worst, l) => l.pct < worst.pct ? l : worst, couponLegs[0]).id
+    : null;
 
   el.innerHTML = `
     <div class="global-stats" style="margin:12px 0;">
@@ -1023,26 +1107,34 @@ function renderCouponSimulator(){
         <div class="label">Probabilité combinée (historique)</div>
         <div class="value">${(probaTotal*100).toFixed(1)}%</div>
       </div>
+      <div class="stat">
+        <div class="label">EV du coupon</div>
+        <div class="value" style="color:${evTotal>=0?'var(--hit)':'var(--miss)'};">${evTotal>=0?'+':''}${(evTotal*100).toFixed(1)}%</div>
+        <div class="footnote">${evTotal>=0 ? 'Rentable sur la durée (statistiquement)' : 'Perdant sur la durée, même si ça gagne parfois'}</div>
+      </div>
     </div>
     <div style="overflow-x:auto;">
       <table>
-        <thead><tr><th>Rangée/Intervalle</th><th>Marché</th><th>Fiabilité</th><th>Cote</th><th></th></tr></thead>
+        <thead><tr><th>Rangée/Intervalle</th><th>Marché</th><th>Fiabilité</th><th>Cote</th><th>EV jambe</th><th></th></tr></thead>
         <tbody>
           ${couponLegs.map(l => {
             const conf = confidenceTag(l.n);
+            const ev = legEV(l);
+            const isWeakest = l.id === weakestId;
             return `
-            <tr>
+            <tr style="${isWeakest ? 'box-shadow: inset 3px 0 0 var(--miss);' : ''}">
               <td>${l.rangeeLabel} / ${l.intervalLabel}</td>
-              <td>${l.marketLabel}</td>
+              <td>${l.marketLabel}${isWeakest ? ' <span class="tag miss">jambe la plus faible</span>' : ''}</td>
               <td><span class="tag ${conf.cls}">${l.pct}% (${conf.label})</span></td>
               <td>${l.cote.toFixed(2)}</td>
+              <td style="color:${ev>=0?'var(--hit)':'var(--miss)'};">${ev>=0?'+':''}${(ev*100).toFixed(1)}%</td>
               <td><button class="ghost danger small" onclick="removeCouponLeg('${l.id}')">✕</button></td>
             </tr>
           `;}).join('')}
         </tbody>
       </table>
     </div>
-    <div class="footnote">La probabilité combinée est le produit des % historiques de chaque marché — une estimation basée sur ton historique, pas une garantie.</div>
+    <div class="footnote">EV = (probabilité × cote) − 1. Positif = rentable sur la durée ; négatif = perdant en moyenne même si ça gagne parfois. La "jambe la plus faible" est celle au % individuel le plus bas — la remplacer améliore le plus la probabilité combinée.</div>
   `;
 }
 
@@ -1215,7 +1307,7 @@ async function finalizeDailyPick(pickId){
   const rec = computeDailyRecommendation(pick.rangeeId, pick.intervalId, pick.cote);
   logPerformance(pick, rec, { htHome, htAway, ftHome, ftAway });
 
-  iv.entries.push({ id: uid(), cote: pick.cote, htHome, htAway, ftHome, ftAway, date: todayStr() });
+  iv.entries.push({ id: uid(), cote: pick.cote, htHome, htAway, ftHome, ftAway, pays: pick.pays || '', date: todayStr() });
   await save();
 
   dailyPicks = dailyPicks.filter(p => p.id !== pickId);
@@ -1342,49 +1434,66 @@ function renderDailyPicks(){
     </div>
   `;
 
+  // Rend une ligne de match (réutilisé dans chaque groupe rangée/intervalle ci-dessous).
+  const renderRow = ({pick, rec, conf}) => `
+    <tr>
+      <td>${pick.label}</td>
+      <td>${pick.cote}</td>
+      <td>${rec ? rec.range : '—'}</td>
+      <td>${rec ? rec.precision : '—'}</td>
+      <td>${rec && rec.top ? rec.top.label : 'Pas de données dans cette tranche'}</td>
+      <td>${rec && rec.top ? `<span class="tag ${rec.top.pct >= 60 ? 'hit' : 'miss'}">${rec.top.pct}%</span>` : '—'}</td>
+      <td><span class="tag ${conf.cls}">${conf.label}</span></td>
+      <td>
+        <div class="inline">
+          <input type="number" min="0" class="w-sm" id="dp-ht-h-${pick.id}">
+          <span>—</span>
+          <input type="number" min="0" class="w-sm" id="dp-ht-a-${pick.id}">
+        </div>
+      </td>
+      <td>
+        <div class="inline">
+          <input type="number" min="0" class="w-sm" id="dp-ft-h-${pick.id}">
+          <span>—</span>
+          <input type="number" min="0" class="w-sm" id="dp-ft-a-${pick.id}">
+        </div>
+      </td>
+      <td style="white-space:nowrap;">
+        <button class="small" onclick="finalizeDailyPick('${pick.id}')">✓ Enregistrer</button>
+        <button class="ghost danger small" onclick="deleteDailyPick('${pick.id}')">✕</button>
+      </td>
+    </tr>
+  `;
+
+  // Regroupe par rangée + intervalle (plutôt qu'une liste unique mélangée) pour éviter de
+  // combiner par erreur des matchs de bases statistiques différentes dans un même coupon.
+  const groups = {};
+  const groupOrder = [];
+  computed.forEach(c => {
+    const key = c.rec ? `${c.rec.rangeeLabel} / ${c.rec.intervalLabel}` : 'Sans intervalle';
+    if (!groups[key]){ groups[key] = []; groupOrder.push(key); }
+    groups[key].push(c);
+  });
+
+  const groupedTables = groupOrder.map(key => `
+    <div style="margin-bottom:16px;">
+      <div class="footnote" style="color:var(--accent);font-size:11.5px;margin-bottom:6px;">${key} — ${groups[key].length} match(s)</div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr><th>Match</th><th>Cote 12</th><th>Tranche</th><th>Précision</th><th>Option recommandée</th><th>Fiabilité</th><th>Confiance</th><th>Score HT</th><th>Score FT</th><th></th></tr>
+          </thead>
+          <tbody>${groups[key].map(renderRow).join('')}</tbody>
+        </table>
+      </div>
+    </div>
+  `).join('');
+
   el.innerHTML = `
     ${eliteBlock}
     ${topBlock}
-    <div style="overflow-x:auto;">
-      <table style="margin-top:10px;">
-        <thead>
-          <tr><th>Match</th><th>Type / Intervalle</th><th>Cote 12</th><th>Tranche</th><th>Précision</th><th>Option recommandée</th><th>Fiabilité</th><th>Confiance</th><th>Score HT</th><th>Score FT</th><th></th></tr>
-        </thead>
-        <tbody>
-          ${computed.map(({pick, rec, conf}) => `
-            <tr>
-              <td>${pick.label}</td>
-              <td>${rec ? rec.rangeeLabel + ' / ' + rec.intervalLabel : '—'}</td>
-              <td>${pick.cote}</td>
-              <td>${rec ? rec.range : '—'}</td>
-              <td>${rec ? rec.precision : '—'}</td>
-              <td>${rec && rec.top ? rec.top.label : 'Pas de données dans cette tranche'}</td>
-              <td>${rec && rec.top ? `<span class="tag ${rec.top.pct >= 60 ? 'hit' : 'miss'}">${rec.top.pct}%</span>` : '—'}</td>
-              <td><span class="tag ${conf.cls}">${conf.label}</span></td>
-              <td>
-                <div class="inline">
-                  <input type="number" min="0" class="w-sm" id="dp-ht-h-${pick.id}">
-                  <span>—</span>
-                  <input type="number" min="0" class="w-sm" id="dp-ht-a-${pick.id}">
-                </div>
-              </td>
-              <td>
-                <div class="inline">
-                  <input type="number" min="0" class="w-sm" id="dp-ft-h-${pick.id}">
-                  <span>—</span>
-                  <input type="number" min="0" class="w-sm" id="dp-ft-a-${pick.id}">
-                </div>
-              </td>
-              <td style="white-space:nowrap;">
-                <button class="small" onclick="finalizeDailyPick('${pick.id}')">✓ Enregistrer</button>
-                <button class="ghost danger small" onclick="deleteDailyPick('${pick.id}')">✕</button>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-    <div class="footnote">Trié par fiabilité : d'abord les picks "fiable" (10+ données dans la tranche), puis "à confirmer", puis "insuffisant". Une fois le score FT rentré et "Enregistrer" cliqué, le match est archivé dans son intervalle et sort de cette liste.</div>
+    ${groupedTables}
+    <div class="footnote">Groupé par rangée/intervalle — construis ton coupon à partir d'un seul groupe à la fois pour ne pas mélanger des bases statistiques différentes. Une fois le score FT rentré et "Enregistrer" cliqué, le match est archivé et sort de cette liste.</div>
   `;
 }
 
@@ -1737,10 +1846,6 @@ function renderIntervalBlock(rangeeId, iv){
               <span>—</span>
               <input type="number" min="0" class="w-sm" id="e-ft-a-${iv.id}" value="${editingEntryId && iv.entries.find(e=>e.id===editingEntryId) ? iv.entries.find(e=>e.id===editingEntryId).ftAway : ''}">
             </div>
-          </div>
-          <div>
-            <label>Pays (optionnel)</label>
-            <input type="text" class="w-md" id="e-pays-${iv.id}" placeholder="ex: Costa Rica" value="${editingEntryId && iv.entries.find(e=>e.id===editingEntryId) ? (iv.entries.find(e=>e.id===editingEntryId).pays || '') : ''}">
           </div>
           ${editingEntryId && iv.entries.find(e=>e.id===editingEntryId)
             ? `<button onclick="saveEditEntry('${rangeeId}','${iv.id}','${editingEntryId}')">Enregistrer</button><button class="ghost" onclick="cancelEditEntry()">Annuler</button>`
